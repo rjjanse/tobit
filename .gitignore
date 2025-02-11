@@ -1,0 +1,13 @@
+# Files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.Rdata
+.RDa
+.docx
+
+# Directories
+dataframes
+data
+results
