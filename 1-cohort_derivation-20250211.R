@@ -24,7 +24,9 @@ path <- "C:/users/rjjan/downloads/predictie data OCT2024.Rdata"
 
 # Import data
 dat_domestico <- import(path,
-                        trust = TRUE)
+                        trust = TRUE) %>%
+    # Remove one wrongly included prevalent dialysis patient
+    filter(studynr == 1335)
 
 # 1. Data exploration ---
 # Keep only first visits
