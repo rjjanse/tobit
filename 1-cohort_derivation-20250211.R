@@ -237,14 +237,20 @@ dat_imputed %<>%
            across(contains("_dt"), \(x) x = as.Date(x, origin = "1970-01-01")))
 
 # Calculate PROMs
-dat_imputed %<>% 
+test <- dat_imputed %>%
     # Creating new variables
     mutate(# PCS
            pcs = sf12_v1(sf12_1, sf12_2, sf12_3, sf12_4, sf12_5, sf12_6, 
                          sf12_7, sf12_8, sf12_9, sf12_10, sf12_11, sf12_12, "pcs"),
            # MCS
            mcs = sf12_v1(sf12_1, sf12_2, sf12_3, sf12_4, sf12_5, sf12_6, 
-                         sf12_7, sf12_8, sf12_9, sf12_10, sf12_11, sf12_12, "mcs"))
+                         sf12_7, sf12_8, sf12_9, sf12_10, sf12_11, sf12_12, "mcs"),
+           # Symptom indicators
+           across(dsi_last_1:dsi_last_30, 
+                  ~ if_else(.x == 0, 1, 0, missing = NA),
+                  .names = "dsi_symp_{.col}")) %>%
+    # Change DSI symptom column names
+    set_colnames()
                 
 
 
