@@ -1,0 +1,125 @@
+---
+title: "Predicting HRQoL using Tobit regression"
+author: "Roemer J. Janse"
+format: docx
+date: 2025-04-07
+---
+
+# 0. Set-up
+```{r set-up}
+# Load packages
+pacman::p_load("conflicted",     # Package conflicts
+               "here",           # Relative directories
+               "dplyr",          # Data wrangling
+               "magrittr",       # Efficient pipelines
+               "purrr",          # Functional programming
+               "stringr",        # Working with character strings
+               "tableone",       # Baseline characteristics table
+               "ggplot2",        # Data visualisation
+               "patchwork"       # Adding plots together
+)
+
+# Solve conflicts
+conflicts_prefer(dplyr::filter)  # Between dplyr & stats
+
+# Source relevant functions
+walk(list.files(here("funs")), ~ source(here(paste0("funs/", .x))))
+
+# Set working directory
+path <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/data/dataframes/"
+
+# Set directory for figures
+figs <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/figures/"
+
+# Load data
+load(paste0(path, "dat_imputed.Rdata"))
+
+```
+
+# 1. Table one
+```{r table one}
+# Get imputation object
+load(paste0(path, "imputation_object.Rdata"))
+
+# Get unimputed data
+dat_tab <- lst_imp[["data"]] %>%
+    # Keep only baseline
+    filter(mtpnt == 0)
+
+# Remove imputation object
+rm(lst_imp)
+
+# Specify which variables in the dataset to include in the baseline table
+listvar <- c(
+    # General information
+    "age", "female", "education", "diab_months",
+    # Comorbidities
+    "fibrillation", "chf", "cvd", "hypertension", "ihd", "pvd", 
+    # Diabetic complications
+    "neuropathy", "retinopathy", "ulcer",
+    # Medication
+    "anticoagulants", "antihypertensives", "aspirin", "bblockers", "ccbs", "glucose_lowering", "insulin", "mras",
+    "rasi", "statins",
+    # Lab
+    "index_alb", "egfr", "hba1c", "ldl", "hdl", "total_cholesterol", "tc_hdl", "triglycerides", "ucrea"
+)
+
+# Specify which variables are continuous
+continuous <- c("age", "index_alb", "egfr", "hba1c", "ldl", "hdl", "total_cholesterol", "tc_hdl", "triglycerides", "ucrea", "diab_months") 
+
+# Specify that all variables not continuous are categorical
+catvar <- listvar[!listvar %in% continuous]
+
+# Make baseline table 
+tab_one <- CreateTableOne(vars = listvar, data = dat_tab, factorVars = catvar, addOverall = TRUE, smd = FALSE, 
+                          strata = "group") %>%
+    # Print to matrix
+    print(printToggle = FALSE, nonnormal = c("egfr", "diab_months", "hba1c", "index_alb", "ldl", 
+                                             "hdl", "tc_hdl", "total_cholesterol", "triglycerides", "ucrea")) %>%
+    # Change to matrix
+    as.matrix() %>%
+    # Keep only columns of interest
+    magrittr::extract(, c(1, 2, 4, 3, 5, 7, 6)) %>%
+    # Change column names
+    set_colnames(c("Overall", "Censored", "Albuminuria", "Died", "Censored_Val", "Albuminuria_Val", "Died_Val")) %>%
+    # To data frame
+    as.data.frame() %>%
+    # Add big marks
+    mutate(across(Overall:Died_Val, \(x) x = prettyNum(x, big.mark = ","))) %>%
+    # Add labels
+    set_rownames(c("Number of individuals",
+                   "Age, years, mean (SD)",
+                   "Female, n (%)",
+                   "Completed higher education, n (%)",
+                   "Months with diabetes, median [IQR]",
+                   "Atrial fibrillation",
+                   "Congestive heart failure",
+                   "Cerebrovascular disease",
+                   "Hypertension",
+                   "Ischemic heart disease",
+                   "Peripheral vascular disease",
+                   "Neuropathy",
+                   "Retinopathy",
+                   "Ulcer",
+                   "Anticoagulants",
+                   "Antihypertensives",
+                   "Aspirin",
+                   "Beta blockers",
+                   "Calcium-channel blockers",
+                   "Glucose-lowering drugs",
+                   "Insulin",
+                   "MRAs",
+                   "RASi",
+                   "Statins",
+                   "ACR, mg/g",
+                   "eGFR, mL/min/1.73m2",
+                   "HbA1c, mmol/mol",
+                   "LDL, mg/dL",
+                   "HDL, mg/dL",
+                   "Total cholesterol, mg/dL",
+                   "Total cholesterol:HDL ratio",
+                   "Triglycerides, mg/dL",
+                   "Urine creatinine, mg/dL"))
+
+
+```

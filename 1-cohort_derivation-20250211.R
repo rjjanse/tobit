@@ -2,7 +2,7 @@
 # Predicting HRQoL using Tobit regression                                     #
 # Roemer J. Janse                                                             #
 # Code for cohort derivation                                                  #
-# Creation date: 2025-02-11 || Last update:  2025-03-21                       #
+# Creation date: 2025-02-11 || Last update:  2025-04-07                       #
 #-----------------------------------------------------------------------------#
 
 # 0. Set-up ----
@@ -30,58 +30,23 @@ walk(list.files(here("funs")), ~ source(here(paste0("funs/", .x))))
 path <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/data/"
 
 # Import data
-dat_domestico <- import(paste0(path, "predictie data OCT2024.Rdata"),
+dat_domestico <- import(paste0(path, "predictie data MAR2025.Rdata"),
                         trust = TRUE) %>%
-    # Remove one wrongly included prevalent dialysis patient
-    filter(studynr != 1335) %>%
     # Set all columns to lowercase
     set_colnames(tolower(colnames(.)))
-
-# Import PKD and information on previous transplantation for individuals without RENINE linkage
-dat_pkd <- import(paste0(path, "pkd.xlsx"),
-                  trust = TRUE) %>%
-    # Rename columns to DOMESTICO format
-    rename(studynr = 1, pkd = 2, prev_ntx = 4, prev_dial = 5) %>%
-    # Reformat prev_dial and prev_ntx to logical indicators
-    mutate(# If there is a numeric value, a date was given for transplantation
-           prev_ntx = case_when(str_detect(prev_ntx, "rans") ~ 0,
-                                str_detect(prev_ntx, "\\d") ~ 1),
-           # If there is a numeric value, a date was given for transplantation
-           prev_dial = case_when(str_detect(prev_dial, "rans|dial") ~ 0,
-                                 str_detect(prev_dial, "\\d") ~ 1),
-           # Dialysis is only collected as prior to transplantation, so prev_dial == 1 & prev_ntx == 0 are wrong artefacts
-           prev_dial = if_else(prev_ntx == 0 & prev_dial == 1, 0, prev_dial)) %>%
-    # Drop primary diagnosis column
-    select(-`Primaire diagnose`) %>%
-    # Change some values for PKD
-    mutate(pkd = case_match(pkd,
-                            "Atheroembolic renal disease - no histology" ~ "Hypertension / Renal vascular disease",
-                            "Chronic hypertensive nephropathy" ~ "Hypertension / Renal vascular disease",
-                            "chronische nierinsufficientie stadium 3" ~ NA,
-                            "Diabetic nephropathy in type II diabetes" ~ "Diabetes Mellitus",
-                            "familiar/hereditary nephropathies" ~ "Familial / hereditary nephropathies",
-                            "Geen deelname studie" ~ NA,
-                            "IgA nefropathie" ~ "Glomerular disease",
-                            "IgA nephropathy" ~ "Glomerular disease",
-                            "Miscellaneous" ~ "Miscellaneous renal disorders",
-                            "Parenchymeuze nierziekte" ~ "Glomerular disease",     # Could also be tubular disease
-                            "syndroom van Goodpasture" ~ "Glomerular disease",
-                            "Unknown" ~ NA,
-                            .default = pkd))
 
 # Remove attributes
 dat_domestico[] <- lapply(dat_domestico, \(x){attributes(x) <- NULL; x})
 
 # 1. Clean up data ----
-# Add missing values for prev_ntx and prev_dial due to missing RENINE linkage and create PKD categories
+# Clean data, categories, and names
 dat_cohort <- dat_domestico %>%
-    # Update variables
-    mutate(# Categorise primary kidney disease
-           pkd = prd_to_pkd(prd)) %>%
-    # Join PKD data to replace missings
-    left_join(dat_pkd, "studynr", suffix = c("", ".added")) %>%
-    # For PKD, prev_dial, and prev_ntx, set missings to value from the added columns
-    mutate(across(c(pkd, prev_dial, prev_ntx), ~ coalesce(.x, get(paste0(cur_column(), ".added"))))) %>%
+    # Fix two data errors 
+    mutate(# Data errors
+           sex = if_else(studynr == 1236, 2, sex),
+           year_of_birth_baseline = if_else(studynr == 1954, 1972, year_of_birth_baseline)) %>%
+    # Rename era_prd to pkd
+    rename(pkd = era_prd) %>%
     # Arrange per individual
     arrange(studynr) %>%
     # Group per individual
@@ -90,8 +55,12 @@ dat_cohort <- dat_domestico %>%
     fill(prev_dial:stop_red, pkd, burgstaat, woonsituatie, .direction = "down") %>%
     # Remove grouping structure again
     ungroup() %>%
-    # Reduce levels for logicals and change PKD from character factor to numeric for imputation
-    mutate(# Change acute_pt from logical 1/2 to 0/1
+    # Calculate age, reduce levels for logicals, and change PKD from character factor to numeric for imputation
+    mutate(# Change birth year to a birth date (using half a year to set month and day)
+           birth_dt = as.Date(paste0(year_of_birth_baseline, "-07-02")),
+           # Calculate age
+           age = round(as.numeric(as.Date(dial_dt) - birth_dt) / 365.25),
+           # Change acute_pt from logical 1/2 to 0/1
            acute_pt = acute_pt - 1,
            # Change IHD to yes/no
            ihd_predial = if_else(ihd_predial == 2, 1, ihd_predial),
@@ -125,12 +94,12 @@ dat_cohort <- dat_domestico %>%
 # Data selection 
 dat_cohort %<>%
     # Variable selection
-    select(studynr, mtpnt, mtpnt_dt, pkd, prev_dial:stop_red, weight, therapie, resid_diur,
+    select(studynr, mtpnt, mtpnt_dt, age, pkd, prev_dial:stop_red, weight, therapie, resid_diur,
            bpsyst, bpdiast, med_epo, med_iron, hb:woonsituatie, sf12_1:dsi_last_30) %>%
     # Remove redundant variables
     # Start therap is inferior to therapie for baseline modality
     # DM type is only filled in for individuals with diabetes, would make imputation weird
-    select(-start_therap, -all_of(paste0("dsi_", 1:30)), -dm_type) %>%
+    select(-start_therap, -all_of(paste0("dsi_", 1:30)), -dm_type, -year_of_birth_baseline) %>%
     # Rename variables for clarity
     rename(modality = therapie,     # Baseline dialysis modality
            ihd = ihd_predial,       # Ischemic heart disease
@@ -197,13 +166,13 @@ lst_imp <- mice(dat_cohort,
                 seed = 1)
 
 # Save object
-save(lst_imp, file = paste0(path, "imputation_object.Rdata"))
+save(lst_imp, file = paste0(path, "dataframes/imputation_object.Rdata"))
 
 # 3. Finalise imputed data ----
 # Get complete data
 dat_imputed <- complete(lst_imp, 
                         action = "long",
-                        include = TRUE)
+                        include = TRUE) 
 
 # Update variable types
 dat_imputed %<>% 
@@ -237,7 +206,7 @@ dat_imputed %<>%
            across(contains("_dt"), \(x) x = as.Date(x, origin = "1970-01-01")))
 
 # Calculate PROMs
-test <- dat_imputed %>%
+dat_imputed %<>%
     # Creating new variables
     mutate(# PCS
            pcs = sf12_v1(sf12_1, sf12_2, sf12_3, sf12_4, sf12_5, sf12_6, 
@@ -247,34 +216,61 @@ test <- dat_imputed %>%
                          sf12_7, sf12_8, sf12_9, sf12_10, sf12_11, sf12_12, "mcs"),
            # Symptom indicators
            across(dsi_last_1:dsi_last_30, 
-                  ~ if_else(.x == 0, 1, 0, missing = NA),
+                  ~ if_else(.x == 0, 0, 1, missing = NA),
                   .names = "dsi_symp_{.col}")) %>%
     # Change DSI symptom column names
-    set_colnames()
-                
+    set_colnames(str_replace(colnames(.), "(?<=dsi_symp_)dsi_last_", "")) %>%
+    # Call row-wise operations to compute sum per individual
+    rowwise() %>%
+    # Calculate symptom burden and symptom count
+    mutate(# Symptom count
+           sc = sum(dsi_symp_1, dsi_symp_2, dsi_symp_3, dsi_symp_4, dsi_symp_5, dsi_symp_6, dsi_symp_7, dsi_symp_8, dsi_symp_9, 
+                    dsi_symp_10, dsi_symp_11, dsi_symp_12, dsi_symp_13, dsi_symp_14, dsi_symp_15, dsi_symp_16, dsi_symp_17, 
+                    dsi_symp_18, dsi_symp_19, dsi_symp_20, dsi_symp_21, dsi_symp_22, dsi_symp_23, dsi_symp_24, dsi_symp_25, 
+                    dsi_symp_26, dsi_symp_27, dsi_symp_28, dsi_symp_29, dsi_symp_30),
+           # Symptom burden
+           sb = sum(dsi_last_1, dsi_last_2, dsi_last_3, dsi_last_4, dsi_last_5, dsi_last_6, dsi_last_7, dsi_last_8, dsi_last_9, 
+                    dsi_last_10, dsi_last_11, dsi_last_12, dsi_last_13, dsi_last_14, dsi_last_15, dsi_last_16, dsi_last_17, 
+                    dsi_last_18, dsi_last_19, dsi_last_20, dsi_last_21, dsi_last_22, dsi_last_23, dsi_last_24, dsi_last_25, 
+                    dsi_last_26, dsi_last_27, dsi_last_28, dsi_last_29, dsi_last_30),
+           # Pain burden to match KDQOL symptoms
+           kdqol_last_pain = pmax(dsi_last_15, dsi_last_16, dsi_last_17),
+           # Pain indicator to match KDQOL symptoms
+           kdqol_symp_pain = pmax(dsi_symp_15, dsi_symp_16, dsi_symp_17),
+           # Symptom count for only symptoms corresponding with symptoms in KDQOL (n = 15)
+           sc_15 = sum(dsi_symp_2, dsi_symp_5, dsi_symp_6, dsi_symp_8, dsi_symp_9, dsi_symp_11, dsi_symp_12, kdqol_symp_pain,
+                       dsi_symp_18, dsi_symp_19, dsi_symp_20, dsi_symp_21, dsi_symp_23, dsi_symp_29, dsi_symp_30),
+           # Symptom burden for only symptoms corresponding with symptoms in KDQOL (n = 15)
+           sb_15 = sum(dsi_last_2, dsi_last_5, dsi_last_6, dsi_last_8, dsi_last_9, dsi_last_11, dsi_last_12, kdqol_last_pain,
+                       dsi_last_18, dsi_last_19, dsi_last_20, dsi_last_21, dsi_last_23, dsi_last_29, dsi_last_30)) %>%
+    # Remove row-wise structure
+    ungroup()
 
+# Remove visit at 3 months as we do not need it and put outcomes (PCS and MCS in wide format
+# Thus, we keep one row per individual with baseline information and their outcomes at 6 and 12 months
+dat_imputed %<>%
+    # Remove visit 3
+    filter(mtpnt != 3) %>%
+    # Pivot PCS and MCS to wide format
+    pivot_wider(names_from = mtpnt,
+                values_from = c(pcs, mcs)) %>%
+    # Arrange for grouping
+    arrange(.imp, studynr, mtpnt_dt) %>%
+    # Group per individual within each imputation
+    group_by(.imp, studynr) %>%
+    # Fill MCS and PCS upwards
+    fill(pcs_0:mcs_12, .direction = "up") %>%
+    # Keep first row per individual
+    slice(1L) %>%
+    # Remove grouping structure
+    ungroup() %>%
+    # Create indicator for censoring
+    mutate(# 6 months
+           cens_6 = if_else(is.na(pcs_6), 1, 0),
+           # 12 months
+           cens_12 = if_else(is.na(pcs_12), 1, 0),
+           # Create extra variables for PCS and MCS containing a 0 in-case of censoring
+           across(c(pcs_6, pcs_12, mcs_6, mcs_12), ~ if_else(is.na(.x), 0, .x), .names = "{.col}_t1"))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Save final data
+save(dat_imputed, file = paste0(path, "dataframes/dat_imputed.Rdata"))
