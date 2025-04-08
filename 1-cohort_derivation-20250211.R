@@ -41,10 +41,12 @@ dat_domestico[] <- lapply(dat_domestico, \(x){attributes(x) <- NULL; x})
 # 1. Clean up data ----
 # Clean data, categories, and names
 dat_cohort <- dat_domestico %>%
-    # Fix two data errors 
+    # Fix data pecularities 
     mutate(# Data errors
            sex = if_else(studynr == 1236, 2, sex),
-           year_of_birth_baseline = if_else(studynr == 1954, 1972, year_of_birth_baseline)) %>%
+           year_of_birth_baseline = if_else(studynr == 1954, 1972, year_of_birth_baseline),
+           # Weird heights of 100 (almost all localised to one centre)
+           height = if_else(height == 100, NA, height)) %>%
     # Rename era_prd to pkd
     rename(pkd = era_prd) %>%
     # Arrange per individual
@@ -120,11 +122,11 @@ mat_prd <- mice(dat_cohort, maxit = 0)[["predictorMatrix"]]
 
 # Define variables that do not have to be imputed
 vec_nimp <- c(# Auxiliary variables
-              "prev_dial", "prev_ntx", "acute_pt", "malign", "malign_nometa", 
+              "prev_dial", "prev_ntx", "acute_pt", "malign_nometa", 
               "malign_meta", "lymphoma", "leukemia", "hmp", "scvd",
               "parathyr", "dementia", "pulm", "ulcer", "liver_mild", "liver_modsev",
-              "aids", "psych", "resid_diur", "bpsyst", "bpdiast", "med_epo",
-              "med_iron", "na", "chol",
+              "aids", "psych", "resid_diur", "med_epo",
+              "med_iron", "chol",
               # Dates
               "mtpnt_dt", "dial_dt", "stop_dt",
               # Meta information
@@ -138,7 +140,7 @@ vec_limp <- c(# DSI variables
               # SF-12 variables
               paste0("sf12_", 1:12),
               # Laboratory values & vitals
-              "bpsyst", "bpdiast", "hb", "na", "chol", "pth", 
+              "bpsyst", "bpdiast", "hb", "na", "pth", 
               # Miscellaneous
               "weight", "resid_diur", "med_epo", "med_iron")
 
@@ -172,7 +174,12 @@ save(lst_imp, file = paste0(path, "dataframes/imputation_object.Rdata"))
 # Get complete data
 dat_imputed <- complete(lst_imp, 
                         action = "long",
-                        include = TRUE) 
+                        include = TRUE) %>%
+    # Calculate extra variables
+    mutate(# BMI
+           bmi = weight / (height / 100) ^ 2,
+           # Presence of partner
+           partner = if_else(woonsituatie == 2 | burgstaat == 2, 1, 0))
 
 # Update variable types
 dat_imputed %<>% 
@@ -273,4 +280,4 @@ dat_imputed %<>%
            across(c(pcs_6, pcs_12, mcs_6, mcs_12), ~ if_else(is.na(.x), 0, .x), .names = "{.col}_t1"))
 
 # Save final data
-save(dat_imputed, file = paste0(path, "dataframes/dat_imputed.Rdata"))
+save(dat_imputed, file = paste0(path, "dat_imputed.Rdata"))

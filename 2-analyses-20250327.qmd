@@ -14,9 +14,12 @@ pacman::p_load("conflicted",     # Package conflicts
                "magrittr",       # Efficient pipelines
                "purrr",          # Functional programming
                "stringr",        # Working with character strings
+               "tidyr",          # Pivoting data
                "tableone",       # Baseline characteristics table
+               "survival",       # Fit Tobit type 1 model
                "ggplot2",        # Data visualisation
-               "patchwork"       # Adding plots together
+               "patchwork",      # Adding plots together
+               "knitr"           # Printing tables to word
 )
 
 # Solve conflicts
@@ -36,90 +39,343 @@ load(paste0(path, "dat_imputed.Rdata"))
 
 ```
 
-# 1. Table one
+# 1. Descriptive tbales
+# 1.1. Table one
 ```{r table one}
-# Get imputation object
-load(paste0(path, "imputation_object.Rdata"))
-
 # Get unimputed data
-dat_tab <- lst_imp[["data"]] %>%
-    # Keep only baseline
-    filter(mtpnt == 0)
-
-# Remove imputation object
-rm(lst_imp)
+dat_unimp <- filter(dat_imputed, .imp == 0)
 
 # Specify which variables in the dataset to include in the baseline table
-listvar <- c(
+vec_var <- c(
     # General information
-    "age", "female", "education", "diab_months",
+    "age", "sex", "burgstaat", "woonsituatie", "partner", 
+    # Vitals
+    "bpsyst", "bpdiast", "bmi", "smoking",
+    # Kidney/dialysis related
+    "pkd", "modality", "acute_pt", "prev_ntx", "med_epo", "med_iron",
     # Comorbidities
-    "fibrillation", "chf", "cvd", "hypertension", "ihd", "pvd", 
-    # Diabetic complications
-    "neuropathy", "retinopathy", "ulcer",
-    # Medication
-    "anticoagulants", "antihypertensives", "aspirin", "bblockers", "ccbs", "glucose_lowering", "insulin", "mras",
-    "rasi", "statins",
-    # Lab
-    "index_alb", "egfr", "hba1c", "ldl", "hdl", "total_cholesterol", "tc_hdl", "triglycerides", "ucrea"
+    "cbd", "dementia", "dm", "ihd", "lvd", "malign", "pvd", "psych",
+    # Laboratory
+    "hb", "na", "chol", "pth",
+    # PROMs
+    "pcs_0", "mcs_0", "sc", "sb"
 )
 
 # Specify which variables are continuous
-continuous <- c("age", "index_alb", "egfr", "hba1c", "ldl", "hdl", "total_cholesterol", "tc_hdl", "triglycerides", "ucrea", "diab_months") 
+vec_cnt <- c("age", "bpsyst", "bpdiast", "bmi", "hb", "na", "chol", "pth", "pcs_0", "mcs_0", "sc", "sb")
 
 # Specify that all variables not continuous are categorical
-catvar <- listvar[!listvar %in% continuous]
+vec_cat <- vec_var[!vec_var %in% vec_cnt]
 
 # Make baseline table 
-tab_one <- CreateTableOne(vars = listvar, data = dat_tab, factorVars = catvar, addOverall = TRUE, smd = FALSE, 
-                          strata = "group") %>%
+tab_one <- CreateTableOne(vars = vec_var, 
+                          data = dat_unimp, 
+                          factorVars = vec_cat) %>%
     # Print to matrix
-    print(printToggle = FALSE, nonnormal = c("egfr", "diab_months", "hba1c", "index_alb", "ldl", 
-                                             "hdl", "tc_hdl", "total_cholesterol", "triglycerides", "ucrea")) %>%
-    # Change to matrix
-    as.matrix() %>%
-    # Keep only columns of interest
-    magrittr::extract(, c(1, 2, 4, 3, 5, 7, 6)) %>%
-    # Change column names
-    set_colnames(c("Overall", "Censored", "Albuminuria", "Died", "Censored_Val", "Albuminuria_Val", "Died_Val")) %>%
+    print(printToggle = FALSE, 
+          contDigits = 1,
+          nonnormal = c("age", "bmi", "chol", "pth", "mcs_0", "pcs_0", "sb", "sc")) %>%
     # To data frame
     as.data.frame() %>%
-    # Add big marks
-    mutate(across(Overall:Died_Val, \(x) x = prettyNum(x, big.mark = ","))) %>%
+    # Add big marks and remove redundant whitespace
+    mutate(# Big marks
+           Overall = prettyNum(Overall, big.mark = ","),
+           # Remove redundant whitespace
+           Overall = str_replace_all(Overall, "(?<=\\()\\s+(?=\\d)", "")) %>%
+    # Set back to matrix
+    as.matrix() %>%
     # Add labels
     set_rownames(c("Number of individuals",
-                   "Age, years, mean (SD)",
+                   "Age, years, median [IQR]",
                    "Female, n (%)",
-                   "Completed higher education, n (%)",
-                   "Months with diabetes, median [IQR]",
-                   "Atrial fibrillation",
-                   "Congestive heart failure",
+                   "Civil status, n (%)", "Single", "Married/cohabitating", "Divorced", "Widowed",
+                   "Living situation, n (%)", "Alone", "With partner", "With parents", "With family", "Caring home",
+                   "Presence of partner, n (%)",
+                   "Systolic blood pressure, mmHg, mean (SD)",
+                   "Diastolic blood pressure, mmHg, mean (SD)",
+                   "BMI, kg/m2, median [IQR]",
+                   "Smoking, n (%)", "Never", "Current", "Quit",
+                   "Primary kidney disease, n (%)", "Diabetes mellitus", "Familial/hereditary nephropathies", "Glomerular disease",
+                   "Hypertension/renal vascular disease", "Tubulointerstitial disease", "Other systemic diseases affecting the kidney",
+                   "Miscellaenous renal disorders",
+                   "Initiated PD, n (%)",
+                   "Acute initiation, n (%)",
+                   "Previous KTx, n (%)",
+                   "EPO use",
+                   "Iron suppletion",
                    "Cerebrovascular disease",
-                   "Hypertension",
+                   "Dementia", 
+                   "Diabetes Mellitus",
                    "Ischemic heart disease",
+                   "Left ventricular dysfunction",
+                   "Malignancy",
                    "Peripheral vascular disease",
-                   "Neuropathy",
-                   "Retinopathy",
-                   "Ulcer",
-                   "Anticoagulants",
-                   "Antihypertensives",
-                   "Aspirin",
-                   "Beta blockers",
-                   "Calcium-channel blockers",
-                   "Glucose-lowering drugs",
-                   "Insulin",
-                   "MRAs",
-                   "RASi",
-                   "Statins",
-                   "ACR, mg/g",
-                   "eGFR, mL/min/1.73m2",
-                   "HbA1c, mmol/mol",
-                   "LDL, mg/dL",
-                   "HDL, mg/dL",
-                   "Total cholesterol, mg/dL",
-                   "Total cholesterol:HDL ratio",
-                   "Triglycerides, mg/dL",
-                   "Urine creatinine, mg/dL"))
+                   "Psychiatric disorder",
+                   "Hb, mmol/L, mean (SD)",
+                   "Sodium, mean (SD)",
+                   "Cholesterol, median (IQR)",
+                   "PTH, median [IQR]",
+                   "PCS, median [IQR]",
+                   "MCS, median [IQR]",
+                   "Symptom count, median [IQR]",
+                   "Symptom burden, median [IQR]"))
 
+# Kable table
+kable(tab_one)
+
+```
+
+# 1.2. Missingness table
+```{r missingness table}
+# Change data to missingness indicators
+dat_missing <- dat_unimp %>%
+    # Keep only relevant columns
+    select(-c(studynr, mtpnt_dt, stop_dt, stop_red, .imp, .id, dsi_symp_1:dsi_symp_30, kdqol_last_pain, kdqol_symp_pain,
+              sc_15, sb_15, pcs_6, pcs_12, mcs_6, mcs_12, cens_6, cens_12, pcs_6_t1, pcs_12_t1, mcs_6_t1, mcs_12_t1,
+              dial_dt)) %>%
+    # Create missingness indicators
+    mutate(across(everything(), \(x) if_else(is.na(x), 1, 0)))
+
+# Specify which variables in the dataset to include in the table
+vec_var <- sort(colnames(dat_missing))
+
+# Make baseline table 
+tab_missing <- CreateTableOne(vars = vec_var, 
+                              data = dat_missing, 
+                              factorVars = vec_var) %>%
+    # Print to matrix
+    print(printToggle = FALSE) %>%
+    # To data frame
+    as.data.frame() %>%
+    # Reset single level variables, add big marks and remove redundant whitespace
+    mutate(# Set variables with no missing to 0 (0)
+           Overall = str_replace_all(Overall, "2110 \\(100\\.0\\)", "0 (0)"),
+           # Big marks
+           Overall = prettyNum(Overall, big.mark = ","),
+           # Remove redundant whitespace
+           Overall = str_replace_all(Overall, "(?<=\\()\\s+(?=\\d)", "")) %>%
+    # Set back to matrix
+    as.matrix() %>%
+    # Add labels
+    set_rownames(c("Number of individuals",
+                   "Acute initiation",
+                   "Age",
+                   "AIDS",
+                   "BMI",
+                   "Diastolic blood pressure",
+                   "Systolic blood pressure",
+                   "Civil status",
+                   "Cerebrovascular diseae",
+                   "Cholesterol",
+                   "Dementia",
+                   "Diabetes mellitus",
+                   "DSI - Constipation",
+                   "DSI - Nausea",
+                   "DSI - Vomiting",
+                   "DSI - Diarrhea",
+                   "DSI - Decreased appetite",
+                   "DSI - Muscle cramps",
+                   "DSI - Swelling in legs",
+                   "DSI - Lightheadedness or dizziness",
+                   "DSI - Shortness of breath",
+                   "DSI - Restless legs or difficulty keeping legs still",
+                   "DSI - Numbness or tingling in feet",
+                   "DSI - Feeling tired or lack of energy",
+                   "DSI - Cough",
+                   "DSI - Dry mouth",
+                   "DSI - Bone or joint pain",
+                   "DSI - Chest pain",
+                   "DSI - Headache",
+                   "DSI - Muscle soreness",
+                   "DSI - Difficulty concentrating",
+                   "DSI - Dry skin",
+                   "DSI - Itching",
+                   "DSI - Worrying",
+                   "DSI - Feeling nervous",
+                   "DSI - Trouble falling asleep",
+                   "DSI - Trouble staying asleep",
+                   "DSI - Feeling irritable",
+                   "DSI - Feeling sad",
+                   "DSI - Feeling anxious",
+                   "DSI - Decreased interest in sex",
+                   "DSI - Difficulty becoming aroused",
+                   "Hb",
+                   "Height",
+                   "Hemiplegia",
+                   "Ischemic heart disease",
+                   "Leukemia",
+                   "Mild liver disease",
+                   "Severe liver diseae",
+                   "Left ventricular dysfunction",
+                   "Lymphoma",
+                   "Malignancy",
+                   "Metastatic malignancy",
+                   "Non-metastatic malignancy",
+                   "MCS",
+                   "EPO use",
+                   "Iron use",
+                   "Dialysis modality",
+                   "Sodium",
+                   "Parathyroidectomy",
+                   "Presence of partner",
+                   "PCS",
+                   "Primary kidney disease",
+                   "Previous dialysis",
+                   "Previous KTx",
+                   "Psychiatric disorder",
+                   "PTH",
+                   "Pulmonary disease",
+                   "Peripheral vascular disease",
+                   "Residual diuresis",
+                   "Symptom burden",
+                   "Symptom count",
+                   "Systemic disease",
+                   "Female",
+                   "SF12 - General health",
+                   "SF12 - Moderate physical activities",
+                   "SF12 - Climbing several flights of stairs",
+                   "SF12 - Accomplished less",
+                   "SF12 - Limited in work or activities",
+                   "SF12 - Accomplished less, physical",
+                   "SF12 - Not careful in work or activities",
+                   "SF12 - Pain interference, emotional",
+                   "SF12 - Feeling calm and peaceful",
+                   "SF12 - Having a lot of energy",
+                   "SF12 - Feeling downhearted and blue",
+                   "SF12 - Interference with social activities",
+                   "Smoking",
+                   "Ulcer",
+                   "Weight",
+                   "Living situation"))
+
+# Kable table
+kable(tab_missing)
+
+```
+
+# 1.3. DSI table
+```{r dsi table}
+# Get DSI data for symptom presence
+dat_dsi_symp <- dat_unimp %>%
+    # Keep only DSI variables
+    select(contains("dsi_symp")) %>%
+    # Pivot to long format (one row per DSI question)
+    pivot_longer(everything()) %>%
+    # Set names to only number
+    mutate(name = as.numeric(str_extract(name, "\\d{1,2}"))) %>%
+    # Remove missing values in value
+    filter(!is.na(value)) %>%
+    # Arrange to group per question
+    arrange(name) %>%
+    # Group per question
+    group_by(name) %>%
+    # Calculate proportion per question
+    summarise(symp = paste0(sum(value, na.rm = TRUE), " (",
+                            format(round(mean(value, na.rm = TRUE) * 100, 1), nsmall = 1), ")")) %>%
+    # Remove grouping structure
+    ungroup()
+
+# Get DSI data for symptom burden
+dat_dsi_last <- dat_unimp %>%
+    # Keep only DSI variables
+    select(contains("dsi_last")) %>%
+    # Pivot to long format (one row per DSI question)
+    pivot_longer(everything()) %>%
+    # Set names to only number
+    mutate(name = as.numeric(str_extract(name, "\\d{1,2}"))) %>%
+    # Remove missing values in value and individuals without the symptom
+    filter(!is.na(value) & value != 0) %>%
+    # Arrange to group per question
+    arrange(name) %>%
+    # Group per question
+    group_by(name) %>%
+    # Calculate proportion per question
+    summarise(last = paste0(median(value, na.rm = TRUE), " [",
+                            quantile(value, probs = 0.25, na.rm = TRUE), "-",
+                            quantile(value, probs = 0.75, na.rm = TRUE), "]")) %>%
+    # Remove grouping structure
+    ungroup()
+
+# Add symptom presence and burden together and create table
+dat_dsi <- left_join(dat_dsi_symp, dat_dsi_last, "name") %>%
+    # Drop symptom number column
+    select(-name) %>%
+    # Change to matrix
+    as.matrix() %>%
+    # Set column names
+    set_colnames(c("Presence, n (%)", "Burden, median [IQR]")) %>%
+    # Set rownames
+    set_rownames(c("Constipation",
+                   "Nausea",
+                   "Vomiting",
+                   "Diarrhea",
+                   "Decreased appetite",
+                   "Muscle cramps",
+                   "Swelling in legs",
+                   "Lightheadedness or dizziness",
+                   "Shortness of breath",
+                   "Restless legs or difficulty keeping legs still",
+                   "Numbness or tingling in feet",
+                   "Feeling tired or lack of energy",
+                   "Cough",
+                   "Dry mouth",
+                   "Bone or joint pain",
+                   "Chest pain",
+                   "Headache",
+                   "Muscle soreness",
+                   "Difficulty concentrating",
+                   "Dry skin",
+                   "Itching",
+                   "Worrying",
+                   "Feeling nervous",
+                   "Trouble falling asleep",
+                   "Trouble staying asleep",
+                   "Feeling irritable",
+                   "Feeling sad",
+                   "Feeling anxious",
+                   "Decreased interest in sex",
+                   "Difficulty becoming aroused"))
+
+# Print table
+kable(dat_dsi)
+
+```
+
+# 2. Outcomes at 6 months
+# 2.1. PCS
+# 2.1.1. Tobit type 1
+```{r t1-06-pcs}
+# Develop model
+fit_t1_06_pcs <- t1_dev(dat_imputed, "pcs_6_t1")
+
+# Get predictions and make data frame
+dat_t1_06_pcs <- t1_prd(dat_imputed, "pcs_6_t1", fit_t1_06_pcs) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(w = ipcw(dat_imputed, "cens_6"),
+           true_y = filter(dat_imputed, .imp == 1)[["pcs_6_t1"]])
+
+# Calculate pseudo R-squared
+dat_t1_06_pcs %$% pseudo_r2(lps, y)
+
+# Draw calibration plot
+ggplot(filter(dat_t1_06_pcs, true_y != 0), aes(x = y, y = true_y)) +
+    # Geometries
+    geom_abline(colour = "black",
+                alpha = 0.3) +
+    geom_point(alpha = 0.3) +
+    geom_smooth(mapping = aes(weight = w),
+                method = "loess",
+                formula = "y ~ x") +
+    # Scaling
+    scale_x_continuous(name = "Predicted PCS",
+                       limits = c(0, 100),
+                       breaks = seq(0, 100, 10)) +
+    scale_y_continuous(name = "Observed PCS",
+                       limits = c(0, 100),
+                       breaks = seq(0, 100, 10)) +
+    # Aesthetics
+    theme_bw()
 
 ```
