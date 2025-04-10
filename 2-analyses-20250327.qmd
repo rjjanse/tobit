@@ -8,22 +8,25 @@ date: 2025-04-07
 # 0. Set-up
 ```{r set-up}
 # Load packages
-pacman::p_load("conflicted",     # Package conflicts
-               "here",           # Relative directories
-               "dplyr",          # Data wrangling
-               "magrittr",       # Efficient pipelines
-               "purrr",          # Functional programming
-               "stringr",        # Working with character strings
-               "tidyr",          # Pivoting data
-               "tableone",       # Baseline characteristics table
-               "survival",       # Fit Tobit type 1 model
-               "ggplot2",        # Data visualisation
-               "patchwork",      # Adding plots together
-               "knitr"           # Printing tables to word
+pacman::p_load("conflicted",      # Package conflicts
+               "here",            # Relative directories
+               "dplyr",           # Data wrangling
+               "magrittr",        # Efficient pipelines
+               "purrr",           # Functional programming
+               "stringr",         # Working with character strings
+               "tidyr",           # Pivoting data
+               "splines",         # Spline functions
+               "tableone",        # Baseline characteristics table
+               "survival",        # Fit Tobit type 1 model
+               "sampleSelection", # Fit Tobit type 2 model
+               "ggplot2",         # Data visualisation
+               "patchwork",       # Adding plots together
+               "knitr"            # Printing tables to word
 )
 
 # Solve conflicts
-conflicts_prefer(dplyr::filter)  # Between dplyr & stats
+conflicts_prefer(dplyr::filter)       # Between dplyr & stats
+conflicts_prefer(magrittr::extract)   # Between tidyr & magrittr
 
 # Source relevant functions
 walk(list.files(here("funs")), ~ source(here(paste0("funs/", .x))))
@@ -341,15 +344,45 @@ kable(dat_dsi)
 
 ```
 
-# 2. Outcomes at 6 months
-# 2.1. PCS
-# 2.1.1. Tobit type 1
+# 2. Linearity checks
+# 2.1. HRQoL components (PCS and MCS)
+```{r linearity checks outcome}
+# PCS at 6 months
+linearity_check_hrqol("pcs_6_t1")
+
+# MCS at 6 months
+linearity_check_hrqol("mcs_6_t1")
+
+# PCS at 12 months
+linearity_check_hrqol("pcs_12_t1")
+
+# MCS at 12 months
+linearity_check_hrqol("mcs_12_t1")
+
+```
+
+# 2.2. Censoring
+```{r linearity checks selection}
+# Censoring at 6 months
+linearity_check_censor("cens_6")
+
+# Censoring at 12 months
+linearity_check_censor("cens_12")
+
+```
+
+# 3. Outcomes at 6 months
+# 3.1. PCS
+# 3.1.1. Tobit type 1
 ```{r t1-06-pcs}
+# Set right hand side of formula
+form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
+
 # Develop model
-fit_t1_06_pcs <- t1_dev(dat_imputed, "pcs_6_t1")
+fit_t1_6_pcs <- t1_dev(dat_imputed, "pcs_6_t1", form_rhs)
 
 # Get predictions and make data frame
-dat_t1_06_pcs <- t1_prd(dat_imputed, "pcs_6_t1", fit_t1_06_pcs) %>%
+dat_t1_6_pcs <- t1_prd(dat_imputed, "pcs_6_t1", fit_t1_6_pcs) %>%
     # Bind columns
     bind_cols() %>%
     # Add weights and observed value
@@ -357,25 +390,36 @@ dat_t1_06_pcs <- t1_prd(dat_imputed, "pcs_6_t1", fit_t1_06_pcs) %>%
            true_y = filter(dat_imputed, .imp == 1)[["pcs_6_t1"]])
 
 # Calculate pseudo R-squared
-dat_t1_06_pcs %$% pseudo_r2(lps, y)
+dat_t1_6_pcs %$% pseudo_r2(lps, y)
 
-# Draw calibration plot
-ggplot(filter(dat_t1_06_pcs, true_y != 0), aes(x = y, y = true_y)) +
-    # Geometries
-    geom_abline(colour = "black",
-                alpha = 0.3) +
-    geom_point(alpha = 0.3) +
-    geom_smooth(mapping = aes(weight = w),
-                method = "loess",
-                formula = "y ~ x") +
-    # Scaling
-    scale_x_continuous(name = "Predicted PCS",
-                       limits = c(0, 100),
-                       breaks = seq(0, 100, 10)) +
-    scale_y_continuous(name = "Observed PCS",
-                       limits = c(0, 100),
-                       breaks = seq(0, 100, 10)) +
-    # Aesthetics
-    theme_bw()
+# Get model calibration
+cal_t1_6_pcs <- t1_cal(dat_t1_6_pcs, "6-month PCS")
+
+```
+
+# 3.1.2. Tobit type 2
+```{r t2-06-pcs}
+# Set right hand side of formula for selection model
+selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6)) + ns(bpsyst, knots = 125) + ns(bmi, knots = 20) + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(35, 48, 60)) + sc + ns(sb, knots = 30)" 
+
+# Set right hand side of formula for outcome model
+outcome_form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t2_6_pcs <- t2_dev(dat_imputed, "pcs_6", selection_form_rhs, outcome_form_rhs)
+
+# Get predictions and make data frame
+dat_t2_6_pcs <- t2_prd(dat_imputed, "pcs_6", "cens_6", fit_t2_6_pcs) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(w = 1 / pr,
+           true_y = filter(dat_imputed, .imp == 1)[["pcs_6"]])
+
+# Calculate pseudo R-squared
+dat_t2_6_pcs %$% pseudo_r2(lps_o, y)
+
+# Get model calibration
+cal_t2_6_pcs <- t2_cal(dat_t2_6_pcs, "6-month PCS")
 
 ```

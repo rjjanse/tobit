@@ -1,7 +1,7 @@
 # Function to calculate final predictions of Tobit type 1
 t1_predict <- function(.data, outcome, coef, intercept){
     # Calculate linear predictors
-    lps <- lp(.data, outcome, coef, intercept)
+    lps <- lp_t1(.data, outcome, coef, intercept)
     
     # Get scale
     scale <- coef[["scale"]]
