@@ -63,7 +63,8 @@ t2_develop <- function(.data, outcome, s_formula_rhs, o_formula_rhs){
                 coef_o = dat_coef_o,
                 predictors_s = s_predictors,
                 predictors_o = o_predictors,
-                cov_e = cov_e)
+                cov_e = cov_e,
+                sigma_o = sigma_o)
     
     # Return results
     return(res)

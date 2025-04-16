@@ -39,8 +39,33 @@ dat_domestico <- import(paste0(path, "predictie data MAR2025.Rdata"),
 dat_domestico[] <- lapply(dat_domestico, \(x){attributes(x) <- NULL; x})
 
 # 1. Clean up data ----
-# Clean data, categories, and names
-dat_cohort <- dat_domestico %>%
+# Data cleaning
+dat_cohort <- 
+    # Add missing in-between rows for all individuals
+    expand.grid(unique(dat_domestico[["studynr"]]), c(0, 3, 6, 12)) %>%
+    # To tibble
+    as_tibble() %>%
+    # Rename variables
+    rename(studynr = 1, mtpnt = 2) %>%
+    # Arrange on studynr
+    arrange(studynr) %>%
+    # Join DOMESTICO data on mtpnt and studynr
+    left_join(dat_domestico, c("studynr", "mtpnt")) %>%
+    # Group by studynr
+    group_by(studynr) %>%
+    # Fill dial_dt and stop_dt downwards
+    fill(dial_dt, stop_dt, .direction = "down") %>%
+    # Create new variables
+    mutate(# If stop_red is missing, add administrative censoring as reason
+           stop_red = if_else(is.na(stop_red), 7, stop_red),
+           # If stop_dt is missing, add administrative censoring as date
+           stop_dt = if_else(is.na(stop_dt), 19722, stop_dt),
+           # Overwrite mtpnt_dt with expected visit date if mtpnt_dt is not available
+           mtpnt_dt = if_else(is.na(mtpnt_dt), as.Date(dial_dt + mtpnt * 30.4375), as.Date(mtpnt_dt)),
+           # Create censoring date
+           censor_dt = pmin(as.Date(stop_dt), as.Date("2023-12-31"), na.rm = TRUE)) %>%
+    # Remove observations after the stop_dt
+    filter(mtpnt_dt <= as.Date(censor_dt)) %>%
     # Fix data pecularities 
     mutate(# Data errors
            sex = if_else(studynr == 1236, 2, sex),
@@ -49,10 +74,6 @@ dat_cohort <- dat_domestico %>%
            height = if_else(height == 100, NA, height)) %>%
     # Rename era_prd to pkd
     rename(pkd = era_prd) %>%
-    # Arrange per individual
-    arrange(studynr) %>%
-    # Group per individual
-    group_by(studynr) %>%
     # Fill downwards all values that are only collected at baseline
     fill(prev_dial:stop_red, pkd, burgstaat, woonsituatie, .direction = "down") %>%
     # Remove grouping structure again
@@ -109,7 +130,6 @@ dat_cohort %<>%
            cbd = pvd3,              # Cerebrovascular disease
            hmp = pvd4               # Hemiplegia
     )
-
 # Create data summary over first visits
 lst_summary_first <- dfSummary(filter(dat_cohort, mtpnt == 0))
 
@@ -171,6 +191,9 @@ lst_imp <- mice(dat_cohort,
 save(lst_imp, file = paste0(path, "dataframes/imputation_object.Rdata"))
 
 # 3. Finalise imputed data ----
+# Load imputation object
+load(paste0(path, "dataframes/imputation_object.Rdata"))
+
 # Get complete data
 dat_imputed <- complete(lst_imp, 
                         action = "long",
@@ -204,7 +227,8 @@ dat_imputed %<>%
            # Smoking
            smoking = factor(smoking, labels = c("Never", "Current", "Quit")),
            # Reason for leaving study
-           stop_red = factor(stop_red, labels = c("KTx", "Restored kidney function", "Stopping dialysis", "Death", "Withdraw informed consent", "Emigration")),
+           stop_red = factor(stop_red, labels = c("KTx", "Restored kidney function", "Stopping dialysis", "Death", 
+                                                  "Withdraw informed consent", "Emigration", "Administrative censoring")),
            # Civil status
            burgstaat = factor(burgstaat, labels = c("Single", "Married/cohabitating", "Divorced", "Widowed")),
            # Living status
@@ -255,16 +279,17 @@ dat_imputed %<>%
 
 # Remove visit at 3 months as we do not need it and put outcomes (PCS and MCS in wide format
 # Thus, we keep one row per individual with baseline information and their outcomes at 6 and 12 months
-dat_imputed %<>%
+test <- dat_imputed %>%
+    select(studynr, .imp, mtpnt, mtpnt_dt, dial_dt, stop_red, stop_dt, pcs, mcs) %>%
     # Remove visit 3
     filter(mtpnt != 3) %>%
     # Pivot PCS and MCS to wide format
     pivot_wider(names_from = mtpnt,
                 values_from = c(pcs, mcs)) %>%
     # Arrange for grouping
-    arrange(.imp, studynr, mtpnt_dt) %>%
+    arrange(studynr, .imp, mtpnt_dt) %>%
     # Group per individual within each imputation
-    group_by(.imp, studynr) %>%
+    group_by(studynr, .imp) %>%
     # Fill MCS and PCS upwards
     fill(pcs_0:mcs_12, .direction = "up") %>%
     # Keep first row per individual
@@ -277,7 +302,11 @@ dat_imputed %<>%
            # 12 months
            cens_12 = if_else(is.na(pcs_12), 1, 0),
            # Create extra variables for PCS and MCS containing a 0 in-case of censoring
-           across(c(pcs_6, pcs_12, mcs_6, mcs_12), ~ if_else(is.na(.x), 0, .x), .names = "{.col}_t1"))
+           across(c(pcs_6, pcs_12, mcs_6, mcs_12), ~ if_else(is.na(.x), 0, .x), .names = "{.col}_t1"),
+           # Calculate time to censoring for 6 months
+           ttc_6 = if_else(cens_6 == 1, as.numeric(stop_dt - dial_dt), 183),
+           # Calculate time to censoring for 12 months
+           ttc_12 = if_else(cens_12 == 1, as.numeric(stop_dt - dial_dt), 365))
 
 # Save final data
 save(dat_imputed, file = paste0(path, "dat_imputed.Rdata"))

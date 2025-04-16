@@ -14,7 +14,7 @@ t2_predict <- function(.data, outcome, cens_outcome, coef, intercept){
     y <- lps_o + cov_e * dnorm(-lps_s) / (1 - pnorm(-lps_s))
     
     # Calculate probability of participation (i.e. cens == 0)
-    pr <- pnorm(-lps_s)
+    pr <- 1 - pnorm(-lps_s)
     
     # Store results in list
     res <- list(lps_s = lps_s,

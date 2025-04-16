@@ -37,6 +37,9 @@ t2_dev <- function(.data, outcome, s_formula_rhs, o_formula_rhs){
     # Get mean covariance of errors
     cov_e <- mean(map_vec(imps, \(x) lst_fit[[x]][["cov_e"]]))
     
+    # Get mean sigma for outcome model
+    sigma_o <- mean(map_vec(imps, \(x) lst_fit[[x]][["sigma_o"]]))
+    
     ## Get spline information for selection model
     # Create vector of spline variables
     vec_spl <- str_extract_all(s_formula_rhs, "(?<=ns\\()\\w+")[[1]]
@@ -131,7 +134,8 @@ t2_dev <- function(.data, outcome, s_formula_rhs, o_formula_rhs){
                 predictors_o = predictors_o,
                 formula_rhs_s = s_formula_rhs2,
                 formula_rhs_o = o_formula_rhs2,
-                cov_e = cov_e)
+                cov_e = cov_e,
+                sigma_o = sigma_o)
     
     # Return results
     return(res)

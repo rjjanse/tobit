@@ -31,12 +31,15 @@ t1_cal <- function(.data, outcome){
     prd <- weighted.mean(dat_obs[["y"]], dat_obs[["w"]])
     
     # Calculate O-E
-    citl <- round(obs - prd, 1)
+    citl <- format(round(obs - prd, 1), nsmall = 1)
 
     # Fit model for  calibration slope and derive slope
     cslope <- survreg(Surv(true_y, true_y > 0, type = "right") ~ lps,
                       data = .data, 
                       dist = "gaussian")[["coefficients"]][["lps"]]
+    
+    # Round calibation slope
+    cslope <- format(round(cslope, 3), nsmall = 3)
     
     # Create output list
     output <- list(plot = p,
