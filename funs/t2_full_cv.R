@@ -42,10 +42,10 @@ t2_full_cv <- function(.data, outcome, s_formula_rhs, o_formula_rhs, fold_val){
     # List with results
     res <- list(prds = dat_prd_tmp,
                 r2 = r2,
-                citl_o = as.numeric(citl_o),
-                cslope_o = as.numeric(cslope_o),
-                citl_s = as.numeric(citl_s),
-                cslope_s = as.numeric(cslope_s),
+                citl_o = citl_o,
+                cslope_o = cslope_o,
+                citl_s = citl_s,
+                cslope_s = cslope_s,
                 c = c)
     
     # Return results

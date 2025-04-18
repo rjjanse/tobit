@@ -39,8 +39,8 @@ t1_full_cv <- function(.data, outcome, formula_rhs, fold_val){
     # List with results
     res <- list(prds = dat_prd_tmp,
                 r2 = r2,
-                citl = as.numeric(citl),
-                cslope = as.numeric(cslope))
+                citl = citl,
+                cslope = cslope)
     
     # Return results
     return(res)

@@ -13,28 +13,45 @@ t2_cv <- function(.data, outcome, plot_label, s_formula_rhs, o_formula_rhs, fold
     dat_tmp <- left_join(.data, dat_folds, "studynr")
     
     # Cross-validate with each fold
-    lst_cv <- map(1:folds, \(x) t1_full_cv(dat_tmp, outcome, formula_rhs, x))
+    lst_cv <- map(1:folds, \(x) t2_full_cv(dat_tmp, outcome, s_formula_rhs, o_formula_rhs, x))
     
     # Get r2 from cross validation
     r2 <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["r2"]]))
     
-    # Get CITL from cross validation
-    citl <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["citl"]]))
+    # Get outcome CITL from cross validation
+    citl_o <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["citl_o"]]))
     
-    # Get calibration slope from cross validation
-    cslope <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["cslope"]]))
+    # Get outcome calibration slope from cross validation
+    cslope_o <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["cslope_o"]]))
+    
+    # Get selection CITL from cross validation
+    citl_s <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["citl_s"]]))
+    
+    # Get selection calibration slope from cross validation
+    cslope_s <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["cslope_s"]]))
+    
+    # Get selection C-statistic from cross validation
+    c <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["c"]]))
     
     # Pool data for calibration plot
     dat_cal <- bind_rows(map(1:folds, \(x) lst_cv[[x]][["prds"]]))
     
-    # Create calibration plot
-    p <- t1_cal(dat_cal, plot_label)[["plot"]]
+    # Create calibration plot for outcome
+    p_o <- t2_cal(dat_cal, plot_label)[["plot_o"]]
+    
+    # Create calibation plot for selection
+    p_s <- t2_cal(dat_cal, "probability")[["plot_s"]]
     
     # Create list of results
-    res <- list(plot = p,
+    res <- list(plot_o = p_o,
+                plot_s = p_s,
                 r2 = r2,
-                citl = citl,
-                cslope = cslope)
+                citl_o = citl_o,
+                cslope_o = cslope_o,
+                citl_s = citl_s,
+                cslope_s = cslope_s,
+                c = c,
+                dat = dat_cal)
     
     # Return list
     return(res)

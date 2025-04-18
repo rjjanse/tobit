@@ -1,5 +1,5 @@
 # Function to get calibration metrics of Tobit type 2
-t2_cal <- function(.data, outcome){
+t2_cal <- function(.data, outcome, colour = "#785EF0"){
     # Subset data to observed individuals
     dat_obs <- filter(.data, !is.na(true_y))
     
@@ -15,18 +15,54 @@ t2_cal <- function(.data, outcome){
         geom_smooth(mapping = aes(weight = w),
                     method = "loess",
                     formula = "y ~ x",
-                    fill = "#785EF0",
-                    colour = "#785EF0") +
+                    fill = colour,
+                    colour = colour) +
         # Transformations
         coord_cartesian(xlim = c(0, 1),
                         ylim = c(0, 1)) +
         # Scaling
-        scale_x_continuous(name = paste0("Predicted ", outcome),
+        scale_x_continuous(name = "Predicted probability",
                            breaks = seq(0, 1, 0.2)) +
-        scale_y_continuous(name = paste0("Observed ", outcome),
+        scale_y_continuous(name = "Observed probability",
                            breaks = seq(0, 1, 0.2)) +
         # Aesthetics
-        theme_bw()
+        theme_calplot()
+    
+    # Get 1st and 3rd quantiles
+    q1 <- quantile(dat_full[["pr"]], probs = 0.025); q3 <- quantile(dat_full[["pr"]], probs = 0.975)
+    
+    # Draw zoomed calibration plot of interquartile range of predictions for selection model
+    p_s_zoom <- ggplot(dat_full, aes(x = pr, y = selected)) +
+        # Geometries
+        geom_abline(colour = "black",
+                    alpha = 0.3) +
+        geom_point(alpha = 0.3) +
+        geom_smooth(mapping = aes(weight = w),
+                    method = "loess",
+                    formula = "y ~ x",
+                    fill = colour,
+                    colour = colour) +
+        # Scaling
+        scale_x_continuous(name = paste0("Predicted ", outcome),
+                           breaks = seq(0, 1, 0.04)) +
+        scale_y_continuous(name = paste0("Observed ", outcome),
+                           breaks = seq(0, 1, 0.04)) +
+        # Transformations
+        coord_cartesian(xlim = c(q1, q3),
+                        ylim = c(q1, q3)) +
+        # Labels
+        ggtitle("Close-up") +
+        # Aesthetics
+        theme_calplot() +
+        theme(axis.title = element_blank(),
+              plot.title = element_text(face = "bold",
+                                        hjust = 0.5,
+                                        size = 12))
+    
+    # Add zoomed plot to full plot
+    p_s <- p_s + inset_element(p_s_zoom, 
+                               0.025, 0.6, 0.4, 0.975)
+                               
     
     # Draw calibration plot for outcome
     p_o <- ggplot(dat_obs, aes(x = y, y = true_y)) +
@@ -37,8 +73,8 @@ t2_cal <- function(.data, outcome){
         geom_smooth(mapping = aes(weight = w),
                     method = "loess",
                     formula = "y ~ x",
-                    fill = "#785EF0",
-                    colour = "#785EF0") +
+                    fill = colour,
+                    colour = colour) +
         # Scaling
         scale_x_continuous(name = paste0("Predicted ", outcome),
                            limits = c(0, 100),
@@ -47,8 +83,8 @@ t2_cal <- function(.data, outcome){
                            limits = c(0, 100),
                            breaks = seq(0, 100, 20)) +
         # Aesthetics
-        theme_bw()
-    
+        theme_calplot()
+
     # Calculate mean observed selection outcome
     obs_s <- mean(!is.na(.data[["true_y"]]))
     
@@ -56,7 +92,7 @@ t2_cal <- function(.data, outcome){
     prd_s <- mean(.data[["pr"]])
     
     # Calculate O-E for selection
-    citl_s <- format(round(obs_s - prd_s, 3), nsmall = 3)
+    citl_s <- round(obs_s - prd_s, 3)
     
     # Calculate weighted mean observed outcome
     obs_o <- weighted.mean(dat_obs[["true_y"]], dat_obs[["w"]])
@@ -65,7 +101,7 @@ t2_cal <- function(.data, outcome){
     prd_o <- weighted.mean(dat_obs[["y"]], dat_obs[["w"]])
     
     # Calculate O-E for outcome
-    citl_o <- format(round(obs_o - prd_o, 1), nsmall = 1)
+    citl_o <- round(obs_o - prd_o, 1)
     
     # Fit model for calibration slopes
     fit_cslope <- selection(selection = selected ~ lps_s, 
@@ -75,13 +111,13 @@ t2_cal <- function(.data, outcome){
                             method = "ml")
     
     # Get calibration slope for selection model
-    cslope_s <- format(round(coef(fit_cslope)[["lps_s"]], 3), nsmall = 3)
+    cslope_s <- round(coef(fit_cslope)[["lps_s"]], 3)
     
     # Get calibration slope for outcome model
-    cslope_o <- format(round(coef(fit_cslope)[["lps_o"]], 3), nsmall = 3)
+    cslope_o <- round(coef(fit_cslope)[["lps_o"]], 3)
     
     # Calculate discrimination for selection model
-    c <- format(round(dat_full %$% Cstat(pr, selected), 2), nsmall = 2)
+    c <- round(dat_full %$% Cstat(pr, selected), 2)
     
     # Create output list
     output <- list(plot_s = p_s,

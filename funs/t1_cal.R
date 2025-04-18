@@ -1,5 +1,5 @@
 # Function to get calibration metrics of Tobit type 1
-t1_cal <- function(.data, outcome){
+t1_cal <- function(.data, outcome, colour = "#785EF0"){
     # Subset data to observed individuals
     dat_obs <- filter(.data, true_y != 0)
     
@@ -12,8 +12,8 @@ t1_cal <- function(.data, outcome){
         geom_smooth(mapping = aes(weight = w),
                     method = "loess",
                     formula = "y ~ x",
-                    fill = "#785EF0",
-                    colour = "#785EF0") +
+                    fill = colour,
+                    colour = colour) +
         # Scaling
         scale_x_continuous(name = paste0("Predicted ", outcome),
                            limits = c(0, 100),
@@ -22,7 +22,7 @@ t1_cal <- function(.data, outcome){
                            limits = c(0, 100),
                            breaks = seq(0, 100, 20)) +
         # Aesthetics
-        theme_bw()
+        theme_calplot()
     
     # Calculate weighted mean observed outcome
     obs <- weighted.mean(dat_obs[["true_y"]], dat_obs[["w"]])
@@ -31,15 +31,15 @@ t1_cal <- function(.data, outcome){
     prd <- weighted.mean(dat_obs[["y"]], dat_obs[["w"]])
     
     # Calculate O-E
-    citl <- format(round(obs - prd, 1), nsmall = 1)
+    citl <- round(obs - prd, 1)
 
     # Fit model for  calibration slope and derive slope
     cslope <- survreg(Surv(true_y, true_y > 0, type = "right") ~ lps,
                       data = .data, 
                       dist = "gaussian")[["coefficients"]][["lps"]]
     
-    # Round calibation slope
-    cslope <- format(round(cslope, 3), nsmall = 3)
+    # Round calibration slope
+    cslope <- round(cslope, 3)
     
     # Create output list
     output <- list(plot = p,

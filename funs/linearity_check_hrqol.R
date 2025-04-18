@@ -78,11 +78,11 @@ linearity_check_hrqol <- function(outcome){
         geom_ribbon(alpha = 0.3) +
         # Scalings
         scale_y_continuous(name = ylabel,
-                           limits = c(0, 100),
                            breaks = seq(0, 100, 20)) +
         # Transformations
         facet_wrap(vars(var),
                    scales = "free") +
+        coord_cartesian(ylim = c(0, 100)) +
         # Aesthetics
         theme_bw() +
         theme(axis.title.x = element_blank(),

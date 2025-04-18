@@ -22,6 +22,7 @@ pacman::p_load("conflicted",      # Package conflicts
                "JM",              # Fit joint models
                "DescTools",       # C-statistic for binary model
                "ggplot2",         # Data visualisation
+               "ggExtra",         # Adding marginal distributions
                "patchwork",       # Adding plots together
                "knitr"            # Printing tables to word
 )
@@ -367,26 +368,57 @@ kable(dat_dsi)
 ## 2.1. HRQoL components (PCS and MCS)
 ```{r linearity checks outcome}
 # PCS at 6 months
-linearity_check_hrqol("pcs_6_t1")
+ggsave("lin_pcs_6.png",
+       linearity_check_hrqol("pcs_6_t1"),
+       path = figs,
+       width = 7.5,
+       height = 7.5,
+       dpi = 600)
 
 # MCS at 6 months
-linearity_check_hrqol("mcs_6_t1")
+ggsave("lin_mcs_6.png",
+       linearity_check_hrqol("mcs_6_t1"),
+       path = figs,
+       width = 7.5,
+       height = 7.5,
+       dpi = 600)
 
 # PCS at 12 months
-linearity_check_hrqol("pcs_12_t1")
+ggsave("lin_pcs_12.png",
+       linearity_check_hrqol("pcs_12_t1"),
+       path = figs,
+       width = 7.5,
+       height = 7.5,
+       dpi = 600)
 
 # MCS at 12 months
-linearity_check_hrqol("mcs_12_t1")
+ggsave("lin_mcs_12.png",
+       linearity_check_hrqol("mcs_12_t1"),
+       path = figs,
+       width = 7.5,
+       height = 7.5,
+       dpi = 600)
 
 ```
 
 ## 2.2. Censoring
 ```{r linearity checks selection}
 # Censoring at 6 months
-linearity_check_censor("cens_6")
+ggsave("lin_cens_6.png",
+       linearity_check_censor("cens_6"),
+       path = figs,
+       width = 7.5,
+       height = 7.5,
+       dpi = 600)
 
 # Censoring at 12 months
-linearity_check_censor("cens_12")
+ggsave("lin_cens_12.png",
+       linearity_check_censor("cens_12"),
+       path = figs,
+       width = 7.5,
+       height = 7.5,
+       dpi = 600)
+
 
 ```
 
@@ -395,7 +427,8 @@ linearity_check_censor("cens_12")
 ### 3.1.1. Tobit type 1
 ```{r t1-06-pcs}
 # Set right hand side of formula
-form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
+## FIX COMMA USE FOR HB KNOT 6.2
+form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
 
 # Develop model
 fit <- t1_dev(dat_imputed, "pcs_6_t1", form_rhs)
@@ -405,7 +438,9 @@ dat_prd <- t1_prd(dat_imputed, "pcs_6_t1", fit) %>%
     # Bind columns
     bind_cols() %>%
     # Add weights and observed value
-    mutate(w = ipcw(dat_imputed, "cens_6"),
+    mutate(# IPCW
+           w = ipcw(dat_imputed, "cens_6"),
+           # True value
            true_y = filter(dat_imputed, .imp == 1)[["pcs_6_pooled"]])
 
 # Calculate pseudo R-squared
@@ -418,9 +453,9 @@ cal <- t1_cal(dat_prd, "6-month PCS")
 cv <- t1_cv(dat_imputed, "pcs_6_t1", "6-month PCS", form_rhs)
 
 # Create table section
-tab_t1_6_pcs <- tibble(metric = c("r2", "citl", "cslope", "c-statistic"),
-                       apparent_pcs = c(r2, cal[["citl"]], cal[["cslope"]], NA),
-                       internal_pcs = c(cv[["r2"]], cv[["citl"]], cv[["cslope"]], NA))
+tab_t1_6_pcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
+                       apparent_pcs = c(NA, r2, cal[["citl"]], cal[["cslope"]]),
+                       internal_pcs = c(NA, cv[["r2"]], cv[["citl"]], cv[["cslope"]]))
 
 # Store plots in specific names
 p_app_t1_6_pcs <- cal[["plot"]]; p_int_t1_6_pcs <- cv[["plot"]]
@@ -430,80 +465,45 @@ p_app_t1_6_pcs <- cal[["plot"]]; p_int_t1_6_pcs <- cv[["plot"]]
 ### 3.1.2. Tobit type 2
 ```{r t2-06-pcs}
 # Set right hand side of formula for selection model
-selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6)) + ns(bpsyst, knots = 125) + ns(bmi, knots = 20) + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(35, 48, 60)) + sc + ns(sb, knots = 30)" 
+selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.2, 8)) + ns(bpsyst, knots = 125) + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 35) + ns(mcs_0, knots = 55) + ns(sc, knots = c(9, 12)) + ns(sb, knots = c(25, 45))" 
 
 # Set right hand side of formula for outcome model
-outcome_form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
+outcome_form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
 
 # Develop model
-fit_t2_6_pcs <- t2_dev(dat_imputed, "pcs_6", selection_form_rhs, outcome_form_rhs)
+fit <- t2_dev(dat_imputed, "pcs_6", selection_form_rhs, outcome_form_rhs)
 
 # Get predictions and make data frame
-dat_t2_6_pcs <- t2_prd(dat_imputed, "pcs_6", "cens_6", fit_t2_6_pcs) %>%
+dat_prd <- t2_prd(dat_imputed, "pcs_6", "cens_6", fit) %>%
     # Bind columns
     bind_cols() %>%
     # Add weights and observed value
-    mutate(w = 1 / pr,
-           true_y = filter(dat_imputed, .imp == 1)[["pcs_6"]])
+    mutate(# IPCW 
+           w = 1 / pr,
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["pcs_6_pooled"]])
 
 # Calculate pseudo R-squared
-r2_t2_6_pcs <- dat_t2_6_pcs %$% pseudo_r2(lps_o, fit_t2_6_pcs[["sigma_o"]])
+r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
 
 # Get model calibration
-cal_t2_6_pcs <- t2_cal(dat_t2_6_pcs, "6-month PCS")
+cal <- t2_cal(dat_prd, "6-month PCS")
+
+# Get cross-validation results
+cv <- t2_cv(dat_imputed, "pcs_6", "6-month PCS", selection_form_rhs, outcome_form_rhs)
+
+# Create table section
+tab_t2_6_pcs <- tibble(metric = c("Tobit type 2", "r2", "citl", "cslope", "citl_s", "cslope_s", "c-statistic"),
+                       apparent_pcs = c(NA, r2, cal[["citl_o"]], cal[["cslope_o"]], cal[["citl_s"]], cal[["cslope_s"]], cal[["c"]]),
+                       internal_pcs = c(NA, cv[["r2"]], cv[["citl_o"]], cv[["cslope_o"]], cv[["citl_s"]], cv[["cslope_s"]], cv[["c"]]))
+
+# Store outcome plots in specific names
+p_app_t2_6_pcs_o <- cal[["plot_o"]]; p_int_t2_6_pcs_o <- cv[["plot_o"]]
+
+# Store selection plots in specific names
+p_app_t2_6_pcs_s <- cal[["plot_s"]]; p_int_t2_6_pcs_s <- cv[["plot_s"]]
+
+# Combine tables
+tab_6_pcs <- bind_rows(tab_t1_6_pcs, tab_t2_6_pcs)
 
 ```
-
-## 3.2. MCS
-### 3.2.1. Tobit type 1
-```{r t1-06-mcs}
-# Set right hand side of formula
-form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
-
-# Develop model
-fit_t1_6_mcs <- t1_dev(dat_imputed, "mcs_6_t1", form_rhs)
-
-# Get predictions and make data frame
-dat_t1_6_mcs <- t1_prd(dat_imputed, "mcs_6_t1", fit_t1_6_mcs) %>%
-    # Bind columns
-    bind_cols() %>%
-    # Add weights and observed value
-    mutate(w = ipcw(dat_imputed, "cens_6"),
-           true_y = filter(dat_imputed, .imp == 1)[["mcs_6_t1"]])
-
-# Calculate pseudo R-squared
-r2_t1_6_mcs <- dat_t1_6_mcs %$% pseudo_r2(lps, fit_t1_6_mcs[["scale"]])
-
- # Get model calibration
-cal_t1_6_mcs <- t1_cal(dat_t1_6_mcs, "6-month MCS")
-
-```
-
-### 3.2.2. Tobit type 2
-```{r t2-06-pcs}
-# Set right hand side of formula for selection model
-selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6)) + ns(bpsyst, knots = 125) + ns(bmi, knots = 20) + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(35, 48, 60)) + sc + ns(sb, knots = 30)" 
-
-# Set right hand side of formula for outcome model
-outcome_form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
-
-# Develop model
-fit_t2_6_mcs <- t2_dev(dat_imputed, "mcs_6", selection_form_rhs, outcome_form_rhs)
-
-# Get predictions and make data frame
-dat_t2_6_mcs <- t2_prd(dat_imputed, "mcs_6", "cens_6", fit_t2_6_mcs) %>%
-    # Bind columns
-    bind_cols() %>%
-    # Add weights and observed value
-    mutate(w = 1 / pr,
-           true_y = filter(dat_imputed, .imp == 1)[["mcs_6"]])
-
-# Calculate pseudo R-squared
-r2_t2_6_mcs <- dat_t2_6_mcs %$% pseudo_r2(lps_o, fit_t2_6_mcs[["sigma_o"]])
-
-# Get model calibration
-cal_t2_6_mcs <- t2_cal(dat_t2_6_mcs, "6-month MCS")
-
-```
-
-# 4. Outcomes at 12 months
