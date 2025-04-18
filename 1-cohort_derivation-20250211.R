@@ -279,8 +279,7 @@ dat_imputed %<>%
 
 # Remove visit at 3 months as we do not need it and put outcomes (PCS and MCS in wide format
 # Thus, we keep one row per individual with baseline information and their outcomes at 6 and 12 months
-test <- dat_imputed %>%
-    select(studynr, .imp, mtpnt, mtpnt_dt, dial_dt, stop_red, stop_dt, pcs, mcs) %>%
+dat_imputed %<>%
     # Remove visit 3
     filter(mtpnt != 3) %>%
     # Pivot PCS and MCS to wide format
@@ -309,4 +308,4 @@ test <- dat_imputed %>%
            ttc_12 = if_else(cens_12 == 1, as.numeric(stop_dt - dial_dt), 365))
 
 # Save final data
-save(dat_imputed, file = paste0(path, "dat_imputed.Rdata"))
+save(dat_imputed, file = paste0(path, "dataframes/dat_imputed.Rdata"))

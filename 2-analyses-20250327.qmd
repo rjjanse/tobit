@@ -19,7 +19,7 @@ pacman::p_load("conflicted",      # Package conflicts
                "tableone",        # Baseline characteristics table
                "survival",        # Fit Tobit type 1 model
                "sampleSelection", # Fit Tobit type 2 model
-               "JMbayes2",        # Fit joint models
+               "JM",              # Fit joint models
                "DescTools",       # C-statistic for binary model
                "ggplot2",         # Data visualisation
                "patchwork",       # Adding plots together
@@ -42,12 +42,27 @@ path <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hr
 figs <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/figures/"
 
 # Load data
-load(paste0(path, "dat_imputed.Rdata"))
+load(paste0(path, "dat_imputed.Rdata")) 
+
+# Calculate pooled outcome for each individual
+dat_imputed %<>% 
+    # Arrange for grouping
+    arrange(studynr, .imp) %>%
+    # Group per individual
+    group_by(studynr) %>%
+    # Calculate mean outcome for each possible outcome
+    mutate(across(c(pcs_6, pcs_12, mcs_6, mcs_12),
+                  \(x) x = mean(x, na.rm = TRUE),
+                  .names = "{.col}_pooled")) %>%
+    # Remove grouping structure
+    ungroup() %>%
+    # Rearrange on imputation, then studynr
+    arrange(.imp, studynr)
 
 ```
 
 # 1. Descriptive tbales
-# 1.1. Table one
+## 1.1. Table one
 ```{r table one}
 # Get unimputed data
 dat_unimp <- filter(dat_imputed, .imp == 0)
@@ -132,7 +147,7 @@ kable(tab_one)
 
 ```
 
-# 1.2. Missingness table
+## 1.2. Missingness table
 ```{r missingness table}
 # Change data to missingness indicators
 dat_missing <- dat_unimp %>%
@@ -260,7 +275,7 @@ kable(tab_missing)
 
 ```
 
-# 1.3. DSI table
+## 1.3. DSI table
 ```{r dsi table}
 # Get DSI data for symptom presence
 dat_dsi_symp <- dat_unimp %>%
@@ -349,7 +364,7 @@ kable(dat_dsi)
 ```
 
 # 2. Linearity checks
-# 2.1. HRQoL components (PCS and MCS)
+## 2.1. HRQoL components (PCS and MCS)
 ```{r linearity checks outcome}
 # PCS at 6 months
 linearity_check_hrqol("pcs_6_t1")
@@ -365,7 +380,7 @@ linearity_check_hrqol("mcs_12_t1")
 
 ```
 
-# 2.2. Censoring
+## 2.2. Censoring
 ```{r linearity checks selection}
 # Censoring at 6 months
 linearity_check_censor("cens_6")
@@ -376,32 +391,43 @@ linearity_check_censor("cens_12")
 ```
 
 # 3. Outcomes at 6 months
-# 3.1. PCS
-# 3.1.1. Tobit type 1
+## 3.1. PCS
+### 3.1.1. Tobit type 1
 ```{r t1-06-pcs}
 # Set right hand side of formula
 form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
 
 # Develop model
-fit_t1_6_pcs <- t1_dev(dat_imputed, "pcs_6_t1", form_rhs)
+fit <- t1_dev(dat_imputed, "pcs_6_t1", form_rhs)
 
 # Get predictions and make data frame
-dat_t1_6_pcs <- t1_prd(dat_imputed, "pcs_6_t1", fit_t1_6_pcs) %>%
+dat_prd <- t1_prd(dat_imputed, "pcs_6_t1", fit) %>%
     # Bind columns
     bind_cols() %>%
     # Add weights and observed value
     mutate(w = ipcw(dat_imputed, "cens_6"),
-           true_y = filter(dat_imputed, .imp == 1)[["pcs_6_t1"]])
+           true_y = filter(dat_imputed, .imp == 1)[["pcs_6_pooled"]])
 
 # Calculate pseudo R-squared
-r2_t1_6_pcs <- dat_t1_6_pcs %$% pseudo_r2(lps, fit_t1_6_pcs[["scale"]])
+r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
 
  # Get model calibration
-cal_t1_6_pcs <- t1_cal(dat_t1_6_pcs, "6-month PCS")
+cal <- t1_cal(dat_prd, "6-month PCS")
+
+# Get cross-validation results
+cv <- t1_cv(dat_imputed, "pcs_6_t1", "6-month PCS", form_rhs)
+
+# Create table section
+tab_t1_6_pcs <- tibble(metric = c("r2", "citl", "cslope", "c-statistic"),
+                       apparent_pcs = c(r2, cal[["citl"]], cal[["cslope"]], NA),
+                       internal_pcs = c(cv[["r2"]], cv[["citl"]], cv[["cslope"]], NA))
+
+# Store plots in specific names
+p_app_t1_6_pcs <- cal[["plot"]]; p_int_t1_6_pcs <- cv[["plot"]]
 
 ```
 
-# 3.1.2. Tobit type 2
+### 3.1.2. Tobit type 2
 ```{r t2-06-pcs}
 # Set right hand side of formula for selection model
 selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6)) + ns(bpsyst, knots = 125) + ns(bmi, knots = 20) + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(35, 48, 60)) + sc + ns(sb, knots = 30)" 
@@ -428,9 +454,56 @@ cal_t2_6_pcs <- t2_cal(dat_t2_6_pcs, "6-month PCS")
 
 ```
 
-# 3.1.3. Joint model
-```{r jm-06-pcs}
+## 3.2. MCS
+### 3.2.1. Tobit type 1
+```{r t1-06-mcs}
+# Set right hand side of formula
+form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
 
+# Develop model
+fit_t1_6_mcs <- t1_dev(dat_imputed, "mcs_6_t1", form_rhs)
 
+# Get predictions and make data frame
+dat_t1_6_mcs <- t1_prd(dat_imputed, "mcs_6_t1", fit_t1_6_mcs) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(w = ipcw(dat_imputed, "cens_6"),
+           true_y = filter(dat_imputed, .imp == 1)[["mcs_6_t1"]])
+
+# Calculate pseudo R-squared
+r2_t1_6_mcs <- dat_t1_6_mcs %$% pseudo_r2(lps, fit_t1_6_mcs[["scale"]])
+
+ # Get model calibration
+cal_t1_6_mcs <- t1_cal(dat_t1_6_mcs, "6-month MCS")
 
 ```
+
+### 3.2.2. Tobit type 2
+```{r t2-06-pcs}
+# Set right hand side of formula for selection model
+selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6)) + ns(bpsyst, knots = 125) + ns(bmi, knots = 20) + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(35, 48, 60)) + sc + ns(sb, knots = 30)" 
+
+# Set right hand side of formula for outcome model
+outcome_form_rhs <- "ns(age, knots = 75) + pcs_0 + ns(mcs_0, knots = c(40, 55)) + ns(bmi, knots = 45) + ihd + ns(hb, knots = c(5, 6)) + ns(sc, knots = 10) + ns(sb, knots = 30) + ns(pth, knots = 200) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t2_6_mcs <- t2_dev(dat_imputed, "mcs_6", selection_form_rhs, outcome_form_rhs)
+
+# Get predictions and make data frame
+dat_t2_6_mcs <- t2_prd(dat_imputed, "mcs_6", "cens_6", fit_t2_6_mcs) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(w = 1 / pr,
+           true_y = filter(dat_imputed, .imp == 1)[["mcs_6"]])
+
+# Calculate pseudo R-squared
+r2_t2_6_mcs <- dat_t2_6_mcs %$% pseudo_r2(lps_o, fit_t2_6_mcs[["sigma_o"]])
+
+# Get model calibration
+cal_t2_6_mcs <- t2_cal(dat_t2_6_mcs, "6-month MCS")
+
+```
+
+# 4. Outcomes at 12 months
