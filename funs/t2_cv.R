@@ -1,5 +1,5 @@
 # Function to cross-validate a Tobit type 2 model
-t2_cv <- function(.data, outcome, plot_label, s_formula_rhs, o_formula_rhs, folds = 5){
+t2_cv <- function(.data, outcome, plot_label, s_formula_rhs, o_formula_rhs, folds = 5, plot_s_title = NULL){
     # Get unique studynrs
     ids <- unique(.data[["studynr"]])
     
@@ -13,7 +13,7 @@ t2_cv <- function(.data, outcome, plot_label, s_formula_rhs, o_formula_rhs, fold
     dat_tmp <- left_join(.data, dat_folds, "studynr")
     
     # Cross-validate with each fold
-    lst_cv <- map(1:folds, \(x) t2_full_cv(dat_tmp, outcome, s_formula_rhs, o_formula_rhs, x))
+    lst_cv <- map(1:folds, \(x) t2_full_cv(dat_tmp, outcome, s_formula_rhs, o_formula_rhs, x, plot_s_title))
     
     # Get r2 from cross validation
     r2 <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["r2"]]))

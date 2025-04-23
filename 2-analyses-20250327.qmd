@@ -2,7 +2,9 @@
 title: "Predicting HRQoL using Tobit regression"
 author: "Roemer J. Janse"
 format: docx
-date: 2025-04-07
+execute:
+    echo: false
+date: 2025-04-23
 ---
 
 # 0. Set-up
@@ -19,7 +21,6 @@ pacman::p_load("conflicted",      # Package conflicts
                "tableone",        # Baseline characteristics table
                "survival",        # Fit Tobit type 1 model
                "sampleSelection", # Fit Tobit type 2 model
-               "JM",              # Fit joint models
                "DescTools",       # C-statistic for binary model
                "ggplot2",         # Data visualisation
                "ggExtra",         # Adding marginal distributions
@@ -155,9 +156,11 @@ dat_missing <- dat_unimp %>%
     # Keep only relevant columns
     select(-c(studynr, mtpnt_dt, stop_dt, stop_red, .imp, .id, dsi_symp_1:dsi_symp_30, kdqol_last_pain, kdqol_symp_pain,
               sc_15, sb_15, pcs_6, pcs_12, mcs_6, mcs_12, cens_6, cens_12, pcs_6_t1, pcs_12_t1, mcs_6_t1, mcs_12_t1,
-              dial_dt)) %>%
+              pcs_6_pooled, pcs_12_pooled, mcs_6_pooled, mcs_12_pooled, ttc_6, ttc_12, dial_dt)) %>%
     # Create missingness indicators
-    mutate(across(everything(), \(x) if_else(is.na(x), 1, 0)))
+    mutate(across(everything(), \(x) if_else(is.na(x), 1, 0))) %>%
+    # Set column names of DSI and SF-12 to double-digit numbers to make sorting work
+    set_colnames(str_replace_all(colnames(.), "(?<=last_|sf12_)(?=\\d$)", "0"))
 
 # Specify which variables in the dataset to include in the table
 vec_var <- sort(colnames(dat_missing))
@@ -427,11 +430,10 @@ ggsave("lin_cens_12.png",
 ### 3.1.1. Tobit type 1
 ```{r t1-06-pcs}
 # Set right hand side of formula
-## FIX COMMA USE FOR HB KNOT 6.2
 form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
 
 # Develop model
-fit <- t1_dev(dat_imputed, "pcs_6_t1", form_rhs)
+fit_t1_6_pcs <- fit <- t1_dev(dat_imputed, "pcs_6_t1", form_rhs)
 
 # Get predictions and make data frame
 dat_prd <- t1_prd(dat_imputed, "pcs_6_t1", fit) %>%
@@ -454,8 +456,8 @@ cv <- t1_cv(dat_imputed, "pcs_6_t1", "6-month PCS", form_rhs)
 
 # Create table section
 tab_t1_6_pcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
-                       apparent_pcs = c(NA, r2, cal[["citl"]], cal[["cslope"]]),
-                       internal_pcs = c(NA, cv[["r2"]], cv[["citl"]], cv[["cslope"]]))
+                       apparent_pcs_6 = c(NA, r2, cal[["citl"]], cal[["cslope"]]),
+                       internal_pcs_6 = c(NA, cv[["r2"]], cv[["citl"]], cv[["cslope"]]))
 
 # Store plots in specific names
 p_app_t1_6_pcs <- cal[["plot"]]; p_int_t1_6_pcs <- cv[["plot"]]
@@ -471,7 +473,7 @@ selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.
 outcome_form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
 
 # Develop model
-fit <- t2_dev(dat_imputed, "pcs_6", selection_form_rhs, outcome_form_rhs)
+fit_t2_6_pcs <- fit <- t2_dev(dat_imputed, "pcs_6", selection_form_rhs, outcome_form_rhs)
 
 # Get predictions and make data frame
 dat_prd <- t2_prd(dat_imputed, "pcs_6", "cens_6", fit) %>%
@@ -487,15 +489,15 @@ dat_prd <- t2_prd(dat_imputed, "pcs_6", "cens_6", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
 
 # Get model calibration
-cal <- t2_cal(dat_prd, "6-month PCS")
+cal <- t2_cal(dat_prd, "6-month PCS", plot_s_title = "Selection")
 
 # Get cross-validation results
-cv <- t2_cv(dat_imputed, "pcs_6", "6-month PCS", selection_form_rhs, outcome_form_rhs)
+cv <- t2_cv(dat_imputed, "pcs_6", "6-month PCS", selection_form_rhs, outcome_form_rhs, plot_s_title = "Selection")
 
 # Create table section
-tab_t2_6_pcs <- tibble(metric = c("Tobit type 2", "r2", "citl", "cslope", "citl_s", "cslope_s", "c-statistic"),
-                       apparent_pcs = c(NA, r2, cal[["citl_o"]], cal[["cslope_o"]], cal[["citl_s"]], cal[["cslope_s"]], cal[["c"]]),
-                       internal_pcs = c(NA, cv[["r2"]], cv[["citl_o"]], cv[["cslope_o"]], cv[["citl_s"]], cv[["cslope_s"]], cv[["c"]]))
+tab_t2_6_pcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
+                       apparent_pcs_6 = c(NA, NA, r2, cal[["citl_o"]], cal[["cslope_o"]], NA, cal[["citl_s"]], cal[["cslope_s"]], cal[["c"]]),
+                       internal_pcs_6 = c(NA, NA, cv[["r2"]], cv[["citl_o"]], cv[["cslope_o"]], NA, cv[["citl_s"]], cv[["cslope_s"]], cv[["c"]]))
 
 # Store outcome plots in specific names
 p_app_t2_6_pcs_o <- cal[["plot_o"]]; p_int_t2_6_pcs_o <- cv[["plot_o"]]
@@ -505,5 +507,415 @@ p_app_t2_6_pcs_s <- cal[["plot_s"]]; p_int_t2_6_pcs_s <- cv[["plot_s"]]
 
 # Combine tables
 tab_6_pcs <- bind_rows(tab_t1_6_pcs, tab_t2_6_pcs)
+
+```
+
+## 3.2. MCS
+### 3.2.1. Tobit type 1
+```{r t1-06-mcs}
+# Set right hand side of formula
+form_rhs <- "ns(age, knots = 75) + ns(pcs_0, knots = 32) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2, 8)) + ns(sc, knots = 12) + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t1_6_mcs <- fit <- t1_dev(dat_imputed, "mcs_6_t1", form_rhs)
+
+# Get predictions and make data frame
+dat_prd <- t1_prd(dat_imputed, "mcs_6_t1", fit) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(# IPCW
+           w = ipcw(dat_imputed, "cens_6"),
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["mcs_6_pooled"]])
+
+# Calculate pseudo R-squared
+r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
+
+ # Get model calibration
+cal <- t1_cal(dat_prd, "6-month MCS")
+
+# Get cross-validation results
+cv <- t1_cv(dat_imputed, "mcs_6_t1", "6-month MCS", form_rhs)
+
+# Create table section
+tab_t1_6_mcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
+                       apparent_mcs_6 = c(NA, r2, cal[["citl"]], cal[["cslope"]]),
+                       internal_mcs_6 = c(NA, cv[["r2"]], cv[["citl"]], cv[["cslope"]]))
+
+# Store plots in specific names
+p_app_t1_6_mcs <- cal[["plot"]]; p_int_t1_6_mcs <- cv[["plot"]]
+
+```
+
+### 3.2.2. Tobit type 2
+```{r t2-06-mcs}
+# Set right hand side of formula for selection model
+selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.2, 8)) + ns(bpsyst, knots = 125) + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 35) + ns(mcs_0, knots = 55) + ns(sc, knots = c(9, 12)) + ns(sb, knots = c(25, 45))" 
+
+# Set right hand side of formula for outcome model
+outcome_form_rhs <- "ns(age, knots = 75) + ns(pcs_0, knots = 32) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2, 8)) + ns(sc, knots = 12) + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t2_6_mcs <- fit <- t2_dev(dat_imputed, "mcs_6", selection_form_rhs, outcome_form_rhs)
+
+# Get predictions and make data frame
+dat_prd <- t2_prd(dat_imputed, "mcs_6", "cens_6", fit) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(# IPCW 
+           w = 1 / pr,
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["mcs_6_pooled"]])
+
+# Calculate pseudo R-squared
+r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
+
+# Get model calibration
+cal <- t2_cal(dat_prd, "6-month MCS")
+
+# Get cross-validation results
+cv <- t2_cv(dat_imputed, "mcs_6", "6-month MCS", selection_form_rhs, outcome_form_rhs)
+
+# Create table section
+tab_t2_6_mcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
+                       apparent_mcs_6 = c(NA, NA, r2, cal[["citl_o"]], cal[["cslope_o"]], NA, cal[["citl_s"]], cal[["cslope_s"]], cal[["c"]]),
+                       internal_mcs_6 = c(NA, NA, cv[["r2"]], cv[["citl_o"]], cv[["cslope_o"]], NA, cv[["citl_s"]], cv[["cslope_s"]], cv[["c"]]))
+
+# Store outcome plots in specific names
+p_app_t2_6_mcs_o <- cal[["plot_o"]]; p_int_t2_6_mcs_o <- cv[["plot_o"]]
+
+# Store selection plots in specific names
+p_app_t2_6_mcs_s <- cal[["plot_s"]]; p_int_t2_6_mcs_s <- cv[["plot_s"]]
+
+# Combine tables
+tab_6_mcs <- bind_rows(tab_t1_6_mcs, tab_t2_6_mcs)
+
+# Combine tables
+tab_6 <- bind_cols(tab_6_pcs, select(tab_6_mcs, -metric))
+
+```
+
+# 4. Outcomes at 12 months
+## 4.1. PCS
+### 4.1.1. Tobit type 1
+```{r t1-12-pcs}
+# Set right hand side of formula
+form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t1_12_pcs <- fit <- t1_dev(dat_imputed, "pcs_12_t1", form_rhs)
+
+# Get predictions and make data frame
+dat_prd <- t1_prd(dat_imputed, "pcs_12_t1", fit) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(# IPCW
+           w = ipcw(dat_imputed, "cens_12"),
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["pcs_12_pooled"]])
+
+# Calculate pseudo R-squared
+r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
+
+ # Get model calibration
+cal <- t1_cal(dat_prd, "12-month PCS")
+
+# Get cross-validation results
+cv <- t1_cv(dat_imputed, "pcs_12_t1", "12-month PCS", form_rhs)
+
+# Create table section
+tab_t1_12_pcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
+                       apparent_pcs_12 = c(NA, r2, cal[["citl"]], cal[["cslope"]]),
+                       internal_pcs_12 = c(NA, cv[["r2"]], cv[["citl"]], cv[["cslope"]]))
+
+# Store plots in specific names
+p_app_t1_12_pcs <- cal[["plot"]]; p_int_t1_12_pcs <- cv[["plot"]]
+
+```
+
+### 4.1.2. Tobit type 2
+```{r t2-12-pcs}
+# Set right hand side of formula for selection model
+selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.2, 8)) + ns(bpsyst, knots = 125) + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 35) + ns(mcs_0, knots = 55) + ns(sc, knots = c(9, 12)) + ns(sb, knots = c(25, 45))" 
+
+# Set right hand side of formula for outcome model
+outcome_form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t2_12_pcs <- fit <- t2_dev(dat_imputed, "pcs_12", selection_form_rhs, outcome_form_rhs)
+
+# Get predictions and make data frame
+dat_prd <- t2_prd(dat_imputed, "pcs_12", "cens_12", fit) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(# IPCW 
+           w = 1 / pr,
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["pcs_12_pooled"]])
+
+# Calculate pseudo R-squared
+r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
+
+# Get model calibration
+cal <- t2_cal(dat_prd, "12-month PCS", plot_s_title = "Selection")
+
+# Get cross-validation results
+cv <- t2_cv(dat_imputed, "pcs_12", "12-month PCS", selection_form_rhs, outcome_form_rhs, plot_s_title = "Selection")
+
+# Create table section
+tab_t2_12_pcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
+                       apparent_pcs_12 = c(NA, NA, r2, cal[["citl_o"]], cal[["cslope_o"]], NA, cal[["citl_s"]], cal[["cslope_s"]], cal[["c"]]),
+                       internal_pcs_12 = c(NA, NA, cv[["r2"]], cv[["citl_o"]], cv[["cslope_o"]], NA, cv[["citl_s"]], cv[["cslope_s"]], cv[["c"]]))
+
+# Store outcome plots in specific names
+p_app_t2_12_pcs_o <- cal[["plot_o"]]; p_int_t2_12_pcs_o <- cv[["plot_o"]]
+
+# Store selection plots in specific names
+p_app_t2_12_pcs_s <- cal[["plot_s"]]; p_int_t2_12_pcs_s <- cv[["plot_s"]]
+
+# Combine tables
+tab_12_pcs <- bind_rows(tab_t1_12_pcs, tab_t2_12_pcs)
+
+```
+
+## 4.2. MCS
+### 4.2.1. Tobit type 1
+```{r t1-12-mcs}
+# Set right hand side of formula
+form_rhs <- "ns(age, knots = 75) + ns(pcs_0, knots = 32) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2, 8)) + ns(sc, knots = 12) + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t1_12_mcs <- fit <- t1_dev(dat_imputed, "mcs_12_t1", form_rhs)
+
+# Get predictions and make data frame
+dat_prd <- t1_prd(dat_imputed, "mcs_12_t1", fit) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(# IPCW
+           w = ipcw(dat_imputed, "cens_12"),
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["mcs_12_pooled"]])
+
+# Calculate pseudo R-squared
+r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
+
+ # Get model calibration
+cal <- t1_cal(dat_prd, "12-month MCS")
+
+# Get cross-validation results
+cv <- t1_cv(dat_imputed, "mcs_12_t1", "12-month MCS", form_rhs)
+
+# Create table section
+tab_t1_12_mcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
+                       apparent_mcs_12 = c(NA, r2, cal[["citl"]], cal[["cslope"]]),
+                       internal_mcs_12 = c(NA, cv[["r2"]], cv[["citl"]], cv[["cslope"]]))
+
+# Store plots in specific names
+p_app_t1_12_mcs <- cal[["plot"]]; p_int_t1_12_mcs <- cv[["plot"]]
+
+```
+
+### 4.2.2. Tobit type 2
+```{r t2-12-mcs}
+# Set right hand side of formula for selection model
+selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.2, 8)) + ns(bpsyst, knots = 125) + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 35) + ns(mcs_0, knots = 55) + ns(sc, knots = c(9, 12)) + ns(sb, knots = c(25, 45))" 
+
+# Set right hand side of formula for outcome model
+outcome_form_rhs <- "ns(age, knots = 75) + ns(pcs_0, knots = 32) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2, 8)) + ns(sc, knots = 12) + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+
+# Develop model
+fit_t2_12_mcs <- fit <- t2_dev(dat_imputed, "mcs_12", selection_form_rhs, outcome_form_rhs)
+
+# Get predictions and make data frame
+dat_prd <- t2_prd(dat_imputed, "mcs_12", "cens_12", fit) %>%
+    # Bind columns
+    bind_cols() %>%
+    # Add weights and observed value
+    mutate(# IPCW 
+           w = 1 / pr,
+           # True value
+           true_y = filter(dat_imputed, .imp == 1)[["mcs_12_pooled"]])
+
+# Calculate pseudo R-squared
+r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
+
+# Get model calibration
+cal <- t2_cal(dat_prd, "12-month MCS")
+
+# Get cross-validation results
+cv <- t2_cv(dat_imputed, "mcs_12", "12-month MCS", selection_form_rhs, outcome_form_rhs)
+
+# Create table section
+tab_t2_12_mcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
+                       apparent_mcs_12 = c(NA, NA, r2, cal[["citl_o"]], cal[["cslope_o"]], NA, cal[["citl_s"]], cal[["cslope_s"]], cal[["c"]]),
+                       internal_mcs_12 = c(NA, NA, cv[["r2"]], cv[["citl_o"]], cv[["cslope_o"]], NA, cv[["citl_s"]], cv[["cslope_s"]], cv[["c"]]))
+
+# Store outcome plots in specific names
+p_app_t2_12_mcs_o <- cal[["plot_o"]]; p_int_t2_12_mcs_o <- cv[["plot_o"]]
+
+# Store selection plots in specific names
+p_app_t2_12_mcs_s <- cal[["plot_s"]]; p_int_t2_12_mcs_s <- cv[["plot_s"]]
+
+# Combine tables
+tab_12_mcs <- bind_rows(tab_t1_12_mcs, tab_t2_12_mcs)
+
+# Combine tables
+tab_12 <- bind_cols(tab_12_pcs, select(tab_12_mcs, apparent_mcs_12, internal_mcs_12))
+
+```
+
+# 5. Combine results
+## 5.1 Tables
+### 5.1.1. Performance
+```{r performance table}
+# Combine tables
+tab_performance <- bind_cols(tab_6, select(tab_12, -metric))
+
+# Kable table
+kable(tab_performance)
+
+```
+
+### 5.1.2. Coefficients tables
+```{r coefficients tables}
+# Print outcome models for Tobit type 1 model
+kable(map(ls()[str_detect(ls(), "fit_")], \(x){
+    # Get model coefficients
+    coefs <- get(x)[["coef"]]
+    
+    # If not empty, print which fit is returned
+    if(!is.null(coefs)) print(x)
+    
+    # Return coefs
+    return(coefs)
+    }))
+
+# Print outcome models for Tobit type 2 models
+kable(map(ls()[str_detect(ls(), "fit_")], \(x){
+    # Get model coefficients
+    coefs <- get(x)[["coef_o"]]
+    
+    # If not empty, print which fit is returned
+    if(!is.null(coefs)) print(x)
+    
+    # Return coefs
+    return(coefs)
+    }))
+
+# Print selection models for Tobit type 2 models
+kable(map(ls()[str_detect(ls(), "fit_")], \(x){
+    # Get model coefficients
+    coefs <- get(x)[["coef_s"]]
+    
+    # If not empty, print which fit is returned
+    if(!is.null(coefs)) print(x)
+    
+    # Return coefs
+    return(coefs)
+    }))
+
+```
+
+## 5.2. Figures
+### 5.2.1. 6 months
+#### 5.2.1.1. Tobit type 1
+```{r figures t1-6}
+# Patch plots together
+p <- wrap_plots(p_app_t1_6_pcs + ggtitle("Apparent"),    # PCS apparent
+                p_int_t1_6_pcs + ggtitle("Internal"),    # PCS internal
+                p_app_t1_6_mcs,                          # MCS apparent
+                p_int_t1_6_mcs,                          # MCS internal
+                ncol = 2,
+                axes = "collect_y")
+
+# Save figure
+ggsave("cal_t1_6.png", p,
+       path = figs,
+       width = 8, height = 8,
+       dpi = 600)
+
+```
+
+#### 5.2.1.1. Tobit type 2
+```{r figures t2-6}
+# Patch plots together for apparent validation
+p <- wrap_plots(p_app_t2_6_pcs_o + ggtitle("Outcome"),      # PCS apparent
+                p_app_t2_6_pcs_s,                           # PCS internal
+                p_app_t2_6_mcs_o,                           # MCS apparent
+                p_app_t2_6_mcs_s,                           # MCS internal
+                ncol = 2)
+
+# Save figure
+ggsave("cal_t2_6_app.png", p,
+       path = figs,
+       width = 8, height = 8,
+       dpi = 600)
+
+# Patch plots together for internal validation
+p <- wrap_plots(p_int_t2_6_pcs_o + ggtitle("Outcome"),      # PCS apparent
+                p_int_t2_6_pcs_s,                           # PCS internal
+                p_int_t2_6_mcs_o,                           # MCS apparent
+                p_int_t2_6_mcs_s,                           # MCS internal
+                ncol = 2)
+
+# Save figure
+ggsave("cal_t2_6_int.png", p,
+       path = figs,
+       width = 8, height = 8,
+       dpi = 600)
+
+```
+
+### 5.2.2. 12 months
+#### 5.2.2.1. Tobit type 1
+```{r figures t1-12}
+# Patch plots together
+p <- wrap_plots(p_app_t1_12_pcs + ggtitle("Apparent"),    # PCS apparent
+                p_int_t1_12_pcs + ggtitle("Internal"),    # PCS internal
+                p_app_t1_12_mcs,                          # MCS apparent
+                p_int_t1_12_mcs,                          # MCS internal
+                ncol = 2,
+                axes = "collect_y")
+
+# Save figure
+ggsave("cal_t1_12.png", p,
+       path = figs,
+       width = 8, height = 8,
+       dpi = 600)
+
+```
+
+#### 5.2.2.1. Tobit type 2
+```{r figures t2-12}
+# Patch plots together for apparent validation
+p <- wrap_plots(p_app_t2_12_pcs_o + ggtitle("Outcome"),      # PCS apparent
+                p_app_t2_12_pcs_s,                           # PCS internal
+                p_app_t2_12_mcs_o,                           # MCS apparent
+                p_app_t2_12_mcs_s,                           # MCS internal
+                ncol = 2)
+
+# Save figure
+ggsave("cal_t2_12_app.png", p,
+       path = figs,
+       width = 8, height = 8,
+       dpi = 600)
+
+# Patch plots together for internal validation
+p <- wrap_plots(p_int_t2_12_pcs_o + ggtitle("Outcome"),      # PCS apparent
+                p_int_t2_12_pcs_s,                           # PCS internal
+                p_int_t2_12_mcs_o,                           # MCS apparent
+                p_int_t2_12_mcs_s,                           # MCS internal
+                ncol = 2)
+
+# Save figure
+ggsave("cal_t2_12_int.png", p,
+       path = figs,
+       width = 8, height = 8,
+       dpi = 600)
 
 ```

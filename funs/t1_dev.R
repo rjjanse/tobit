@@ -33,7 +33,7 @@ t1_dev <- function(.data, outcome, formula_rhs){
     # Create vector of knots
     vec_knt <- vec_knt[str_detect(vec_knt, "ns\\(")] %>%
         # Keep only knots argument
-        str_extract_all("knots = c?\\(?\\d+,?\\s?\\d*\\)?(?=\\))")
+        str_extract_all("knots = .+(?=\\))")
  
     # Get subset of data
     dat_tmp <- filter(.data, .imp == 1)

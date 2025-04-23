@@ -1,5 +1,5 @@
 # Function to get calibration metrics of Tobit type 2
-t2_cal <- function(.data, outcome, colour = "#785EF0"){
+t2_cal <- function(.data, outcome, colour = "#785EF0", plot_s_title = NULL){
     # Subset data to observed individuals
     dat_obs <- filter(.data, !is.na(true_y))
     
@@ -28,6 +28,9 @@ t2_cal <- function(.data, outcome, colour = "#785EF0"){
         # Aesthetics
         theme_calplot()
     
+    # Add title to plot if title label is not NULL
+    if(!is.null(plot_s_title)) p_s <- p_s + ggtitle(plot_s_title)
+    
     # Get 1st and 3rd quantiles
     q1 <- quantile(dat_full[["pr"]], probs = 0.025); q3 <- quantile(dat_full[["pr"]], probs = 0.975)
     
@@ -44,24 +47,20 @@ t2_cal <- function(.data, outcome, colour = "#785EF0"){
                     colour = colour) +
         # Scaling
         scale_x_continuous(name = paste0("Predicted ", outcome),
-                           breaks = seq(0, 1, 0.04)) +
+                           breaks = round(seq(q1, q3, length.out = 3), 2)) +
         scale_y_continuous(name = paste0("Observed ", outcome),
-                           breaks = seq(0, 1, 0.04)) +
+                           breaks = round(seq(q1, q3, length.out = 3), 2)) +
         # Transformations
         coord_cartesian(xlim = c(q1, q3),
                         ylim = c(q1, q3)) +
-        # Labels
-        ggtitle("Close-up") +
         # Aesthetics
         theme_calplot() +
-        theme(axis.title = element_blank(),
-              plot.title = element_text(face = "bold",
-                                        hjust = 0.5,
-                                        size = 12))
+        theme(axis.title = element_blank())
     
     # Add zoomed plot to full plot
     p_s <- p_s + inset_element(p_s_zoom, 
-                               0.025, 0.6, 0.4, 0.975)
+                               0.025, 0.6, 0.4, 0.975,
+                               ignore_tag = TRUE)
                                
     
     # Draw calibration plot for outcome
@@ -100,7 +99,7 @@ t2_cal <- function(.data, outcome, colour = "#785EF0"){
     # Calculate weighted mean predicted outcome
     prd_o <- weighted.mean(dat_obs[["y"]], dat_obs[["w"]])
     
-    # Calculate O-E for outcome
+    2# Calculate O-E for outcome
     citl_o <- round(obs_o - prd_o, 1)
     
     # Fit model for calibration slopes
