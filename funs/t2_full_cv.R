@@ -1,5 +1,5 @@
 # Function to fully develop and validate a Tobit type 2 model for cross-validation
-t2_full_cv <- function(.data, outcome, s_formula_rhs, o_formula_rhs, fold_val, plot_s_title){
+t2_full_cv <- function(.data, outcome, s_formula_rhs, o_formula_rhs, fold_val, inset_coords, plot_s_title){
     # Store data temporarily to have it function inside the ipcw function
     dat_tmp <- .data
     
@@ -31,7 +31,7 @@ t2_full_cv <- function(.data, outcome, s_formula_rhs, o_formula_rhs, fold_val, p
     r2 <- dat_prd_tmp %$% pseudo_r2(lps_o, fit_tmp[["sigma_o"]])
     
     # Get model calibration
-    cal <- t2_cal(dat_prd_tmp, "placeholder", plot_s_title)
+    cal <- t2_cal(dat_prd_tmp, "placeholder", inset_coords = inset_coords, plot_s_title = plot_s_title)
     
     # Extract metrics from outcome model calibration
     citl_o <- cal[["citl_o"]]; cslope_o <- cal[["cslope_o"]]

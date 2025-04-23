@@ -1,5 +1,5 @@
 # Function to get calibration metrics of Tobit type 2
-t2_cal <- function(.data, outcome, colour = "#785EF0", plot_s_title = NULL){
+t2_cal <- function(.data, outcome, colour = "#785EF0", inset_coords = c(0.025, 0.6, 0.4, 0.975), plot_s_title = NULL){
     # Subset data to observed individuals
     dat_obs <- filter(.data, !is.na(true_y))
     
@@ -59,7 +59,7 @@ t2_cal <- function(.data, outcome, colour = "#785EF0", plot_s_title = NULL){
     
     # Add zoomed plot to full plot
     p_s <- p_s + inset_element(p_s_zoom, 
-                               0.025, 0.6, 0.4, 0.975,
+                               inset_coords[[1]], inset_coords[[2]], inset_coords[[3]], inset_coords[[4]],
                                ignore_tag = TRUE)
                                
     

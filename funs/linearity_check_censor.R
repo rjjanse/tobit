@@ -62,10 +62,10 @@ linearity_check_censor <- function(outcome){
         mutate(var = case_match(var, 
                                 "age" ~ "Age (years)",
                                 "bmi"~ "BMI (kg/m2)",
-                                "mcs_0" ~ "Baseline MCS",
-                                "pcs_0" ~ "Baseline PCS",
+                                "mcs_0" ~ "Baseline MCS score",
+                                "pcs_0" ~ "Baseline PCS score",
                                 "bpsyst" ~ "Systolic blood pressure (mmHg)",
-                                "hb" ~ "Haemoglobin",
+                                "hb" ~ "Haemoglobin (mmol/L)",
                                 "sb" ~ "Symptom burden",
                                 "sc" ~ "Symptom count"))
     

@@ -121,11 +121,11 @@ tab_one <- CreateTableOne(vars = vec_var,
                    "Smoking, n (%)", "Never", "Current", "Quit",
                    "Primary kidney disease, n (%)", "Diabetes mellitus", "Familial/hereditary nephropathies", "Glomerular disease",
                    "Hypertension/renal vascular disease", "Tubulointerstitial disease", "Other systemic diseases affecting the kidney",
-                   "Miscellaenous renal disorders",
+                   "Miscellaneous renal disorders",
                    "Initiated PD, n (%)",
                    "Acute initiation, n (%)",
                    "Previous KTx, n (%)",
-                   "EPO use",
+                   "ESA use",
                    "Iron suppletion",
                    "Cerebrovascular disease",
                    "Dementia", 
@@ -238,7 +238,7 @@ tab_missing <- CreateTableOne(vars = vec_var,
                    "Metastatic malignancy",
                    "Non-metastatic malignancy",
                    "MCS",
-                   "EPO use",
+                   "ESA use",
                    "Iron use",
                    "Dialysis modality",
                    "Sodium",
@@ -449,10 +449,10 @@ dat_prd <- t1_prd(dat_imputed, "pcs_6_t1", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
 
  # Get model calibration
-cal <- t1_cal(dat_prd, "6-month PCS")
+cal <- t1_cal(dat_prd, "6-month PCS score")
 
 # Get cross-validation results
-cv <- t1_cv(dat_imputed, "pcs_6_t1", "6-month PCS", form_rhs)
+cv <- t1_cv(dat_imputed, "pcs_6_t1", "6-month PCS score", form_rhs)
 
 # Create table section
 tab_t1_6_pcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
@@ -489,10 +489,10 @@ dat_prd <- t2_prd(dat_imputed, "pcs_6", "cens_6", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
 
 # Get model calibration
-cal <- t2_cal(dat_prd, "6-month PCS", plot_s_title = "Selection")
+cal <- t2_cal(dat_prd, "6-month PCS score", plot_s_title = "Selection")
 
 # Get cross-validation results
-cv <- t2_cv(dat_imputed, "pcs_6", "6-month PCS", selection_form_rhs, outcome_form_rhs, plot_s_title = "Selection")
+cv <- t2_cv(dat_imputed, "pcs_6", "6-month PCS score", selection_form_rhs, outcome_form_rhs, plot_s_title = "Selection")
 
 # Create table section
 tab_t2_6_pcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
@@ -533,10 +533,10 @@ dat_prd <- t1_prd(dat_imputed, "mcs_6_t1", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
 
  # Get model calibration
-cal <- t1_cal(dat_prd, "6-month MCS")
+cal <- t1_cal(dat_prd, "6-month MCS score")
 
 # Get cross-validation results
-cv <- t1_cv(dat_imputed, "mcs_6_t1", "6-month MCS", form_rhs)
+cv <- t1_cv(dat_imputed, "mcs_6_t1", "6-month MCS score", form_rhs)
 
 # Create table section
 tab_t1_6_mcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
@@ -573,10 +573,10 @@ dat_prd <- t2_prd(dat_imputed, "mcs_6", "cens_6", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
 
 # Get model calibration
-cal <- t2_cal(dat_prd, "6-month MCS")
+cal <- t2_cal(dat_prd, "6-month MCS score")
 
 # Get cross-validation results
-cv <- t2_cv(dat_imputed, "mcs_6", "6-month MCS", selection_form_rhs, outcome_form_rhs)
+cv <- t2_cv(dat_imputed, "mcs_6", "6-month MCS score", selection_form_rhs, outcome_form_rhs)
 
 # Create table section
 tab_t2_6_mcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
@@ -621,10 +621,10 @@ dat_prd <- t1_prd(dat_imputed, "pcs_12_t1", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
 
  # Get model calibration
-cal <- t1_cal(dat_prd, "12-month PCS")
+cal <- t1_cal(dat_prd, "12-month PCS score")
 
 # Get cross-validation results
-cv <- t1_cv(dat_imputed, "pcs_12_t1", "12-month PCS", form_rhs)
+cv <- t1_cv(dat_imputed, "pcs_12_t1", "12-month PCS score", form_rhs)
 
 # Create table section
 tab_t1_12_pcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
@@ -661,10 +661,18 @@ dat_prd <- t2_prd(dat_imputed, "pcs_12", "cens_12", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
 
 # Get model calibration
-cal <- t2_cal(dat_prd, "12-month PCS", plot_s_title = "Selection")
+cal <- t2_cal(dat_prd, "12-month PCS score",
+              inset_coords = c(0.6, 0.0625, 0.975, 0.4),
+              plot_s_title = "Selection")
 
 # Get cross-validation results
-cv <- t2_cv(dat_imputed, "pcs_12", "12-month PCS", selection_form_rhs, outcome_form_rhs, plot_s_title = "Selection")
+cv <- t2_cv(dat_imputed, 
+            "pcs_12", 
+            "12-month PCS score", 
+            selection_form_rhs, 
+            outcome_form_rhs,
+            inset_coords = c(0.6, 0.0625, 0.975, 0.4), 
+            plot_s_title = "Selection")
 
 # Create table section
 tab_t2_12_pcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
@@ -705,10 +713,10 @@ dat_prd <- t1_prd(dat_imputed, "mcs_12_t1", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps, fit[["scale"]])
 
  # Get model calibration
-cal <- t1_cal(dat_prd, "12-month MCS")
+cal <- t1_cal(dat_prd, "12-month MCS score")
 
 # Get cross-validation results
-cv <- t1_cv(dat_imputed, "mcs_12_t1", "12-month MCS", form_rhs)
+cv <- t1_cv(dat_imputed, "mcs_12_t1", "12-month MCS score", form_rhs)
 
 # Create table section
 tab_t1_12_mcs <- tibble(metric = c("Tobit type 1", "r2", "citl", "cslope"),
@@ -745,10 +753,10 @@ dat_prd <- t2_prd(dat_imputed, "mcs_12", "cens_12", fit) %>%
 r2 <- dat_prd %$% pseudo_r2(lps_o, fit[["sigma_o"]])
 
 # Get model calibration
-cal <- t2_cal(dat_prd, "12-month MCS")
+cal <- t2_cal(dat_prd, "12-month MCS score", inset_coords = c(0.6, 0.0625, 0.975, 0.4))
 
 # Get cross-validation results
-cv <- t2_cv(dat_imputed, "mcs_12", "12-month MCS", selection_form_rhs, outcome_form_rhs)
+cv <- t2_cv(dat_imputed, "mcs_12", "12-month MCS score", selection_form_rhs, outcome_form_rhs, inset_coords = c(0.6, 0.0625, 0.975, 0.4))
 
 # Create table section
 tab_t2_12_mcs <- tibble(metric = c("Tobit type 2", "o", "r2", "citl", "cslope", "s", "citl_s", "cslope_s", "c-statistic"),
@@ -818,6 +826,39 @@ kable(map(ls()[str_detect(ls(), "fit_")], \(x){
     # Return coefs
     return(coefs)
     }))
+
+```
+
+### 5.1.3. Reasons for censoring
+```{r censor reasons}
+# Keep single imputation
+dat_cens <- filter(dat_imputed, .imp == 1)
+
+# Censored individuals at six months
+n_six <- table(dat_cens[["cens_6"]])[["1"]]
+
+# Censored individuals at twelve months
+n_twelve <- table(dat_cens[["cens_12"]])[["1"]]
+
+# Create dataframe with censoring distributions
+tab_cens <- bind_cols(names(dat_cens %$% table(stop_red, cens_6)[, 2]),
+                      dat_cens %$% table(stop_red, cens_6)[, 2],
+                      dat_cens %$% table(stop_red, cens_12)[, 2]) %>%
+    # Reset column names
+    set_colnames(c("Reason", "six", "twelve")) %>%
+    # Finalise table
+    mutate(# Calculate proportion for six months
+           prp_six = six / n_six,
+           # Calculate proportion for twelve months
+           prp_twelve = twelve / n_twelve,
+           # Format six months
+           `Six months` = paste0(six, " (", str_replace_all(format(round(prp_six * 100, 1), nsmall = 1), "\\s*", ""), ")"),
+           `Twelve months` = paste0(twelve, " (", str_replace_all(format(round(prp_twelve * 100, 1), nsmall = 1), "\\s*", ""), ")")) %>%
+    # Keep only relevant columns
+    select(-c(six:prp_twelve))
+
+# Kable table
+kable(tab_cens)
 
 ```
 

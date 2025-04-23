@@ -8,10 +8,10 @@ linearity_check_hrqol <- function(outcome){
     
     # Set label for y axis
     ylabel <- case_match(outcome,
-                         "pcs_6_t1" ~ "PCS at 6 months",
-                         "mcs_6_t1" ~ "MCS at 6 months",
-                         "pcs_12_t1" ~ "PCS at 12 months",
-                         "mcs_12_t1" ~ "MCS at 12 months")
+                         "pcs_6_t1" ~ "PCS score at 6 months",
+                         "mcs_6_t1" ~ "MCS score at 6 months",
+                         "pcs_12_t1" ~ "PCS score at 12 months",
+                         "mcs_12_t1" ~ "MCS score at 12 months")
     
     # Create vector of continuous variables
     vec_cont <- c("age", "bmi", "pth", "hb", "pcs_0", "mcs_0", "bmi", "sc", "sb")
@@ -64,9 +64,9 @@ linearity_check_hrqol <- function(outcome){
         mutate(var = case_match(var, 
                                 "age" ~ "Age (years)",
                                 "bmi"~ "BMI (kg/m2)",
-                                "mcs_0" ~ "Baseline MCS",
-                                "pcs_0" ~ "Baseline PCS",
-                                "pth" ~ "PTH",
+                                "mcs_0" ~ "Baseline MCS score",
+                                "pcs_0" ~ "Baseline PCS score",
+                                "pth" ~ "PTH (pmol/L)",
                                 "hb" ~ "Haemoglobin",
                                 "sb" ~ "Symptom burden",
                                 "sc" ~ "Symptom count"))
