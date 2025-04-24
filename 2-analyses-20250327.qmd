@@ -602,7 +602,7 @@ tab_6 <- bind_cols(tab_6_pcs, select(tab_6_mcs, -metric))
 ### 4.1.1. Tobit type 1
 ```{r t1-12-pcs}
 # Set right hand side of formula
-form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+form_rhs <- "ns(age, knots = c(50, 65, 75)) + pcs_0 + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + pth + partner + pkd + sex + smoking + modality"
 
 # Develop model
 fit_t1_12_pcs <- fit <- t1_dev(dat_imputed, "pcs_12_t1", form_rhs)
@@ -639,10 +639,10 @@ p_app_t1_12_pcs <- cal[["plot"]]; p_int_t1_12_pcs <- cv[["plot"]]
 ### 4.1.2. Tobit type 2
 ```{r t2-12-pcs}
 # Set right hand side of formula for selection model
-selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.2, 8)) + ns(bpsyst, knots = 125) + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 35) + ns(mcs_0, knots = 55) + ns(sc, knots = c(9, 12)) + ns(sb, knots = c(25, 45))" 
+selection_form_rhs <- "ns(age, knots = c(50, 65, 80)) + sex + ns(hb, knots = c(5, 6.2)) + bpsyst + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(42, 48)) + ns(sc, knots = 11) + ns(sb, knots = 60)" 
 
 # Set right hand side of formula for outcome model
-outcome_form_rhs <- "ns(age, knots = 80) + pcs_0 + ns(mcs_0, knots = 55) + ns(bmi, knots = 40) + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+outcome_form_rhs <- "ns(age, knots = c(50, 65, 75)) + pcs_0 + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2)) + ns(sc, knots = 12) + ns(sb, knots = 30) + pth + partner + pkd + sex + smoking + modality"
 
 # Develop model
 fit_t2_12_pcs <- fit <- t2_dev(dat_imputed, "pcs_12", selection_form_rhs, outcome_form_rhs)
@@ -694,7 +694,7 @@ tab_12_pcs <- bind_rows(tab_t1_12_pcs, tab_t2_12_pcs)
 ### 4.2.1. Tobit type 1
 ```{r t1-12-mcs}
 # Set right hand side of formula
-form_rhs <- "ns(age, knots = 75) + ns(pcs_0, knots = 32) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2, 8)) + ns(sc, knots = 12) + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+form_rhs <- "ns(age, knots = c(50, 65, 75)) + ns(pcs_0, knots = 20) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2)) + sc + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
 
 # Develop model
 fit_t1_12_mcs <- fit <- t1_dev(dat_imputed, "mcs_12_t1", form_rhs)
@@ -731,10 +731,10 @@ p_app_t1_12_mcs <- cal[["plot"]]; p_int_t1_12_mcs <- cv[["plot"]]
 ### 4.2.2. Tobit type 2
 ```{r t2-12-mcs}
 # Set right hand side of formula for selection model
-selection_form_rhs <- "ns(age, knots = c(40, 80)) + sex + ns(hb, knots = c(5, 6.2, 8)) + ns(bpsyst, knots = 125) + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 35) + ns(mcs_0, knots = 55) + ns(sc, knots = c(9, 12)) + ns(sb, knots = c(25, 45))" 
+selection_form_rhs <- "ns(age, knots = c(50, 65, 80)) + sex + ns(hb, knots = c(5, 6.2)) + bpsyst + bmi + ihd + malign + modality + dm + pkd + ns(pcs_0, knots = 30) + ns(mcs_0, knots = c(42, 48)) + ns(sc, knots = 11) + ns(sb, knots = 60)" 
 
 # Set right hand side of formula for outcome model
-outcome_form_rhs <- "ns(age, knots = 75) + ns(pcs_0, knots = 32) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2, 8)) + ns(sc, knots = 12) + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
+outcome_form_rhs <- "ns(age, knots = c(50, 65, 75)) + ns(pcs_0, knots = 20) + mcs_0 + bmi + ihd + ns(hb, knots = c(5, 6.2)) + sc + ns(sb, knots = 75) + ns(pth, knots = 50) + partner + pkd + sex + smoking + modality"
 
 # Develop model
 fit_t2_12_mcs <- fit <- t2_dev(dat_imputed, "mcs_12", selection_form_rhs, outcome_form_rhs)
