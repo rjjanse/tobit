@@ -23,7 +23,7 @@ t1_cv <- function(.data, outcome, plot_label, formula_rhs, folds = 5){
     
     # Get calibration slope from cross validation
     cslope <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["cslope"]]))
-    
+
     # Pool data for calibration plot
     dat_cal <- bind_rows(map(1:folds, \(x) lst_cv[[x]][["prds"]]))
     

@@ -29,7 +29,7 @@ t2_cv <- function(.data, outcome, plot_label, s_formula_rhs, o_formula_rhs, fold
     
     # Get selection calibration slope from cross validation
     cslope_s <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["cslope_s"]]))
-    
+
     # Get selection C-statistic from cross validation
     c <- mean(map_vec(1:folds, \(x) lst_cv[[x]][["c"]]))
     

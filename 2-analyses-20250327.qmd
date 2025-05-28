@@ -4,7 +4,7 @@ author: "Roemer J. Janse"
 format: docx
 execute:
     echo: false
-date: 2025-04-23
+date: 2025-05-28
 ---
 
 # 0. Set-up
@@ -41,7 +41,7 @@ walk(list.files(here("funs")), ~ source(here(paste0("funs/", .x))))
 path <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/data/dataframes/"
 
 # Set directory for figures
-figs <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/figures/"
+figs <- "C:/users/rjjanse.lumcnet/onedrive - lumc/research/projects/17. tobit_hrqol/figures/thesis/"
 
 # Load data
 load(paste0(path, "dat_imputed.Rdata")) 
@@ -878,7 +878,7 @@ p <- wrap_plots(p_app_t1_6_pcs + ggtitle("Apparent"),    # PCS apparent
 ggsave("cal_t1_6.png", p,
        path = figs,
        width = 8, height = 8,
-       dpi = 600)
+       dpi = 1200)
 
 ```
 
@@ -895,7 +895,7 @@ p <- wrap_plots(p_app_t2_6_pcs_o + ggtitle("Outcome"),      # PCS apparent
 ggsave("cal_t2_6_app.png", p,
        path = figs,
        width = 8, height = 8,
-       dpi = 600)
+       dpi = 1200)
 
 # Patch plots together for internal validation
 p <- wrap_plots(p_int_t2_6_pcs_o + ggtitle("Outcome"),      # PCS apparent
@@ -908,7 +908,7 @@ p <- wrap_plots(p_int_t2_6_pcs_o + ggtitle("Outcome"),      # PCS apparent
 ggsave("cal_t2_6_int.png", p,
        path = figs,
        width = 8, height = 8,
-       dpi = 600)
+       dpi = 1200)
 
 ```
 
@@ -927,7 +927,7 @@ p <- wrap_plots(p_app_t1_12_pcs + ggtitle("Apparent"),    # PCS apparent
 ggsave("cal_t1_12.png", p,
        path = figs,
        width = 8, height = 8,
-       dpi = 600)
+       dpi = 1200)
 
 ```
 
@@ -944,7 +944,7 @@ p <- wrap_plots(p_app_t2_12_pcs_o + ggtitle("Outcome"),      # PCS apparent
 ggsave("cal_t2_12_app.png", p,
        path = figs,
        width = 8, height = 8,
-       dpi = 600)
+       dpi = 1200)
 
 # Patch plots together for internal validation
 p <- wrap_plots(p_int_t2_12_pcs_o + ggtitle("Outcome"),      # PCS apparent
@@ -957,6 +957,9 @@ p <- wrap_plots(p_int_t2_12_pcs_o + ggtitle("Outcome"),      # PCS apparent
 ggsave("cal_t2_12_int.png", p,
        path = figs,
        width = 8, height = 8,
-       dpi = 600)
+       dpi = 1200)
 
+```
+
+```{r}
 ```
